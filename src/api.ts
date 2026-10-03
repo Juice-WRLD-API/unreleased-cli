@@ -69,6 +69,9 @@ export interface RequestOptions {
   body?: unknown
   /** Use this token instead of the saved one (null sends none). */
   token?: string | null
+  /** Not tied to the running command: Ctrl+C on it doesn't cancel this (for
+   *  requests made on the player's behalf, in the background). */
+  detached?: boolean
 }
 
 export function apiUrl(path: string, params: Record<string, string | number | null | undefined> = {}): string {
@@ -83,7 +86,7 @@ export async function apiFetch<T>(path: string, params: Record<string, string | 
     method: opts.method ?? 'GET',
     headers: headers(token, opts.body !== undefined),
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-    signal: activeSignal,
+    signal: opts.detached ? undefined : activeSignal,
   })
   if (!res.ok) throw new Error(await errorText(res))
   if (res.status === 204) return undefined as T

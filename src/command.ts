@@ -2,7 +2,7 @@ import { getMe } from './api'
 import { getToken, loadConfig } from './config'
 import type { Shell } from './shell'
 
-export type Group = 'Files' | 'Library' | 'Player' | 'People' | 'Admin' | 'Fun' | 'Shell' | 'Account'
+export type Group = 'Files' | 'Library' | 'Player' | 'People' | 'Admin' | 'Fun' | 'Settings' | 'Shell' | 'Account'
 
 export interface Command {
   name: string

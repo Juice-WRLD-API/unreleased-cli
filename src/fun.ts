@@ -3,7 +3,7 @@ import { loadPools } from 'site:heardle'
 import { apiBase, VERSION } from './api'
 import { fail, type Command } from './command'
 import { getToken, loadConfig } from './config'
-import { color } from './out'
+import { accentRamp, color } from './out'
 import { canOpenScreen, openScreen, visibleLength, wrapText, type Screen } from './screen'
 import type { Shell } from './shell'
 import { getSong } from './songs'
@@ -101,7 +101,7 @@ function fetchText(sh: Shell): string {
     ['Playing', p?.current ? `${p.current.title} · queue ${p.queue.length}` : 'nothing'],
   ]
   const head = `${user?.name ?? 'guest'}@unreleased`
-  const text = [color.green(head), '-'.repeat(head.length), ...info.map(([k, v]) => `${color.green(k)}: ${v}`)]
+  const text = [color.user(head), '-'.repeat(head.length), ...info.map(([k, v]) => `${color.user(k)}: ${v}`)]
   const rows = Math.max(LOGO.length, text.length)
   return Array.from({ length: rows }, (_, i) => `${color.yellow(LOGO[i] ?? ' '.repeat(LOGO[0].length))}  ${text[i] ?? ''}`).join('\n')
 }
@@ -143,14 +143,16 @@ function matrixScreen(): Parameters<typeof openScreen>[0] {
       const i = Math.floor(Math.random() * glyph.length)
       if (age[i] < TRAIL) glyph[i] = pick()
     }
+    // The head is hot; the trail fades from the theme's bright accent to dark
+    // (green in the default theme).
+    const [dark, mid, bright, hot] = accentRamp().map((p) => `\x1b[0;${p}m`)
     const lines: string[] = []
     for (let r = 0; r < rows; r++) {
       let line = ''
       let last = ''
       for (let c = 0; c < cols; c++) {
         const a = age[r * cols + c]
-        // The head is white-hot; the trail fades from bright green to dark.
-        const style = a === 0 ? '\x1b[1;97m' : a < 4 ? '\x1b[0;92m' : a < 12 ? '\x1b[0;32m' : a < TRAIL ? '\x1b[0;2;32m' : ''
+        const style = a === 0 ? hot : a < 4 ? bright : a < 12 ? mid : a < TRAIL ? dark : ''
         if (style !== last) { line += style || '\x1b[0m'; last = style }
         line += style ? glyph[r * cols + c] : ' '
       }
@@ -236,11 +238,24 @@ export const FUN_COMMANDS: Command[] = [
       if (!m) fail('usage: watch [-n seconds] <command>')
       const seconds = Math.min(300, Math.max(1, m![1] ? Number(m![1]) : 2))
       const command = m![2].trim().replace(/^(["'])([\s\S]*)\1$/, '$2')
-      if (/^(watch|matrix|wordle|heardle|login|source|\.)\b/i.test(command)) fail(`watch: ${command.split(/\s+/)[0]} can’t run inside watch`)
+      if (/^(watch|matrix|visualizer|viz|wordle|heardle|login|source|\.)\b/i.test(command)) fail(`watch: ${command.split(/\s+/)[0]} can’t run inside watch`)
       needScreen(sh, 'watch')
       const { body, settle } = watchScreen(sh, command, seconds)
       await openScreen(body)
       await settle()
+    },
+  },
+  {
+    name: 'full', aliases: ['fullscreen'], group: 'Shell', usage: 'full',
+    description: 'Ask the terminal window to go fullscreen, and again to leave. Not every terminal allows being asked (then it is F11)',
+    run: (_a, sh) => {
+      if (sh.scripted) fail('full: not inside a script or watch')
+      if (!process.stdout.isTTY) fail('full: needs an interactive terminal')
+      // xterm's window operation 10;2 (toggle fullscreen); terminals that don't
+      // have it ignore it.
+      process.stdout.write('\x1b[10;2t')
+      const ignores = process.env.WT_SESSION || process.platform === 'win32'
+      sh.print(ignores ? 'asked the terminal to toggle fullscreen - Windows terminals usually ignore that, so press F11' : 'asked the terminal to toggle fullscreen', 'dim')
     },
   },
   {

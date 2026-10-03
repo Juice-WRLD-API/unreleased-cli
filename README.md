@@ -14,13 +14,12 @@ saved 44 files (25.9 MB) to covers
 ## Install
 
 ```
-cd cli
 npm install
 npm run build
 npm link          # puts `unreleased` on your PATH
 ```
 
-You can also run it without linking: `node cli/dist/unreleased.mjs`. It needs Node 20 or newer and has no runtime dependencies. Playback also needs [mpv](https://mpv.io) (`winget install shinchiro.mpv`, `brew install mpv`, or your package manager).
+You can also run it without linking: `node dist/unreleased.mjs`. It needs Node 20 or newer and has no runtime dependencies. Playback also needs [mpv](https://mpv.io) (`winget install shinchiro.mpv`, `brew install mpv`, or your package manager).
 
 ## Use
 
@@ -39,8 +38,9 @@ Commands (type `help <command>` in the shell for the details of each one):
 - **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
 - **People:** `user`, `lookup`
 - **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
-- **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `wordle`, `heardle`
-- **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `date`, `clear`, `exit`, `help`
+- **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `wordle`, `heardle`
+- **Settings:** `set`, `settings`, `termtheme`
+- **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `exit`, `help`
 - **Account:** `login`, `logout`, `whoami`, `version`
 
 Things that work the same as on the site:
@@ -87,7 +87,9 @@ The music stops when you leave the shell, so `unreleased play …` on its own sa
 
 The CLI looks for mpv on PATH and then in the usual install folders. Set `UNRELEASED_MPV` to its path if it lives somewhere else. mpv reads your own `mpv.conf`, so settings like the audio device carry over.
 
-Plays here aren't added to your listening history on the site.
+When you're signed in, a song counts as played once you've listened to it: 30 seconds in, or halfway through anything shorter, the same rule as the site's player. The play is added to your listening history on the site (`POST /accounts/account/me/listening-plays/`), so it shows up in `stats`, Home and your profile. Skipping through a queue doesn't count, and a song you restart or seek back to the start of can count again. Files played from the tree have no song id and never count. If the server refuses a play, the shell says so once.
+
+The song's play counter in your profile goes up by one as well. The server has no increment for it (the counters are one JSON blob the client replaces whole), so the CLI reads the blob, adds the plays and writes it back, keeping every other field as it was. That write waits a few seconds so a run of plays becomes one write, and the shell sends any that are left when you exit. If the shell is killed instead (the terminal window is closed), the last few seconds of counts are lost, but the history entries are not. The site merges counters with max(), so a count raised here isn't undone by a stale copy there.
 
 ## Admin
 
@@ -109,12 +111,28 @@ These cover the Admin page's review queues and site moderation, using the same e
 - `fortune` prints a random lyric line from a random song. Try `fortune | juicesay`.
 - `juicesay [text]` has a juice box say it.
 - `matrix` is digital rain. Any key leaves.
+- `visualizer` (or `viz`) is a live spectrum of the song that's playing. Any key leaves. mpv can't hand its audio over, so a second mpv decodes the same stream to a temp file and the bars come from that, which means the song is downloaded a second time while the screen is open.
 - `wordle [daily | unlimited]` is the song-title Wordle, using the site's own puzzle logic, so the daily puzzle is the same one. Type a title and press Enter. Esc leaves, and your progress is saved.
 - `heardle` gives practice rounds: Tab plays the clip, Enter guesses (an empty Enter skips), and ↑↓ picks a suggestion. The clip plays through its own mpv. Music that was playing gets paused, and `play` resumes it.
 
-`matrix`, `wordle`, `heardle` and `watch` take over the whole terminal, then hand it back as it was. They need an interactive terminal, so they won't run from a pipe or a script.
+`matrix`, `visualizer`, `wordle`, `heardle` and `watch` take over the whole terminal, then hand it back as it was. They need an interactive terminal, so they won't run from a pipe or a script.
 
 Wordle and Heardle keep their progress, streaks and song lists in `~/.unreleased/storage.json`. That's separate from your browser's, the same way two browsers are separate. They use the default game settings, because the settings you change on the site are stored in your browser.
+
+## Settings
+
+`settings` lists what you can change, and `set <setting> [value]` shows or changes one (`set volume 40`, `set shuffle toggle`; Tab completes the names and choices). They're kept in `~/.unreleased/settings.json`, so they carry over to the next session, and without the shell (`unreleased set volume 40`) the value is saved for next time. The site's Settings screen is mostly look and layout, so only the parts a command line has are here:
+
+| Setting | |
+|---|---|
+| `theme` | The terminal colour scheme, the same as `termtheme` |
+| `color` | Colour in the output (`NO_COLOR` turns it off too) |
+| `volume`, `speed`, `repeat`, `shuffle` | The player's modes. The `volume`, `speed`, `repeat` and `shuffle` commands change the same values, and they now stay put between sessions, as on the site |
+| `pitch-shift` | Let the pitch follow the speed (off keeps the pitch where it was) |
+
+`termtheme [name]` lists the colour schemes (the site's own list, so a new one there turns up here after the next sync and build) or switches to one. A scheme colours the prompt, messages, rain and visualizer in truecolor, and the default one uses your terminal's own palette. It can't change the terminal's background.
+
+`full` asks the terminal window to go fullscreen, and to leave again. It sends the xterm request for that, which many terminals ignore (Windows Terminal does), so F11 is the fallback.
 
 ## Signing in
 
@@ -140,6 +158,7 @@ Everything is kept in `~/.unreleased`. Set `UNRELEASED_HOME` to use another fold
 | `config.json` | The token and account name (owner-only permissions where the OS supports it), plus an optional `"api"` base URL and `"rules"` route rules (set both with the `api` command) |
 | `history` | Typed commands. Start a line with a space and it won't be saved. |
 | `aliases.json` | Your aliases |
+| `settings.json` | What `set` and `termtheme` change: theme, colour, volume, speed, repeat, shuffle, pitch-shift |
 | `storage.json` | Wordle and Heardle progress, streaks and their cached song lists |
 | `cache/catalog.json` | The song catalog `stats` and `shuffle <era>` use, refreshed daily |
 | `rc` | Commands run each time the interactive shell starts |
@@ -155,11 +174,12 @@ Git Bash on Windows rewrites a bare `/` argument into its own install path, so `
 
 ## How it's built
 
-Some of the CLI is the site's own code, compiled in by `build.mjs`:
+Some of the CLI is the site's own code, compiled in by `build.mjs`. That code lives in `site/`, a copy of the files from the site repo (kept in the same folder layout, so their imports still resolve). `site/SYNCED_FROM.json` says which site commit it was taken from, and `site-modules.mjs` lists which modules are used and which of their imports are swapped for a Node version:
 
 - `cat`, `head`, `tail`, `wc`, `grep`, `locate`, `tree` and `du` come from `src/renderer/src/lib/terminalFileTools.ts`. Its imports point at `src/files.ts`, the Node version of the site's `terminalFiles.ts`.
 - The `stats` maths comes from `lib/listeningStats.ts`. Its two helpers from `juicewrldApi.ts` are swapped for `src/shims/juicewrldApi.ts`.
 - Playlist name matching comes from `lib/terminal/types.ts`.
+- The `termtheme` colour schemes come from `lib/terminal/themeStore.ts` (its `react` import is swapped for a stub).
 - The Wordle and Heardle logic comes from `lib/wordle.ts`, `lib/heardle.ts` and `lib/versionsApi.ts`. That covers the daily pick, grading, title search and version matching. Their request helpers are swapped for shims in `src/shims/`, and `localStorage` for `src/shims/localStorage.ts`.
 
-A change to those on the site reaches the CLI on the next `npm run build`. The declarations in `src/site.d.ts` have to stay in step with their signatures. The other commands are ports, because their site versions read the app's stores.
+A change to those on the site reaches the CLI when you run `npm run sync` (it copies the files from the site checkout next to this repo, `../music-player-web`; pass another path with `npm run sync -- <path>` or `UNRELEASED_SITE`) and then `npm run build`. The sync works out the file list itself by bundling against the checkout, so a new import in one of those modules is picked up without editing anything. The declarations in `src/site.d.ts` have to stay in step with their signatures. The other commands are ports, because their site versions read the app's stores.

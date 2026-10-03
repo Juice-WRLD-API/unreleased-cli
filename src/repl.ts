@@ -3,6 +3,7 @@ import { getToken, HISTORY_MAX, loadConfig, readRc } from './config'
 import { historySearchActive, installHistorySearch } from './historySearch'
 import { color, writeTone, type Tone } from './out'
 import { Player } from './player'
+import { flushPlays, recordPlay } from './plays'
 import { screenActive } from './screen'
 import { Shell, type Prompter } from './shell'
 import { VERSION } from './api'
@@ -61,13 +62,17 @@ export async function startRepl(): Promise<void> {
   // over a full screen or a Ctrl+R search it waits until that's closed.
   const held: { text: string; tone: Tone }[] = []
   const flushHeld = (): void => { for (const n of held.splice(0)) writeTone(n.text, n.tone) }
-  shell.player = new Player((text, tone = 'dim') => {
+  const notify = (text: string, tone: Tone = 'dim'): void => {
     if (screenActive() || historySearchActive()) { held.push({ text, tone }); return }
     if (running) { writeTone(text, tone); return }
     process.stdout.write('\r\x1b[2K')
     writeTone(text, tone)
     rl.prompt(true)
-  })
+  }
+  shell.player = new Player(notify)
+  // A song listened to (30 seconds, or half of a short one) goes into the
+  // account's listening history on the site.
+  shell.player.onCredit = (track) => recordPlay(track, (text) => notify(text, 'error'))
   installHistorySearch(rl, () => shell.history, () => !running, flushHeld)
   const stopMusic = (): void => shell.player?.shutdown()
   process.on('exit', stopMusic)
@@ -106,4 +111,6 @@ export async function startRepl(): Promise<void> {
   shell.abort()
   if (shell.player?.current) process.stdout.write(color.dim('music stopped\n'))
   stopMusic()
+  // Play counts from the last few seconds are still waiting to be written.
+  await Promise.race([flushPlays(), new Promise((resolve) => setTimeout(resolve, 4000).unref())])
 }

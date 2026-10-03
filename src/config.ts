@@ -6,11 +6,13 @@ import { join } from 'node:path'
 //   config.json  the API token and the account it belongs to, API override
 //   history      typed commands, one per line, like a shell's
 //   aliases.json the user's own shortcuts (alias name=command)
+//   settings.json what set/termtheme change (theme, volume, ...)
 //   rc           commands run when the interactive shell starts
 export const HOME_DIR = process.env.UNRELEASED_HOME || join(homedir(), '.unreleased')
 const CONFIG_FILE = join(HOME_DIR, 'config.json')
 const HISTORY_FILE = join(HOME_DIR, 'history')
 const ALIAS_FILE = join(HOME_DIR, 'aliases.json')
+const SETTINGS_FILE = join(HOME_DIR, 'settings.json')
 export const RC_FILE = join(HOME_DIR, 'rc')
 
 export const HISTORY_MAX = 300
@@ -77,4 +79,13 @@ export function readRc(): string[] {
   try {
     return existsSync(RC_FILE) ? readFileSync(RC_FILE, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')) : []
   } catch { return [] }
+}
+
+/** The saved `set` values, by setting name (prefs.ts reads and writes them). */
+export function loadSettings(): Record<string, unknown> {
+  return readJson<Record<string, unknown>>(SETTINGS_FILE, {})
+}
+
+export function saveSettings(settings: Record<string, unknown>): void {
+  try { writePrivate(SETTINGS_FILE, JSON.stringify(settings, null, 2) + '\n') } catch { /* the session still works */ }
 }

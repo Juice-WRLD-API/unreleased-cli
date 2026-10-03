@@ -18,7 +18,8 @@
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "start": "node dist/unreleased.mjs",
-    "prepack": "node build.mjs"
+    "prepack": "node build.mjs",
+    "sync": "node scripts/sync-site.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

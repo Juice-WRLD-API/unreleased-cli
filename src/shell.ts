@@ -13,6 +13,8 @@ import { LIBRARY_COMMANDS } from './library'
 import { color, writeTone, type Tone } from './out'
 import { PEOPLE_COMMANDS } from './people'
 import { PLAYER_COMMANDS } from './playback'
+import { SETTINGS_COMMANDS } from './settings'
+import { VISUALIZER_COMMANDS } from './visualizer'
 import type { Player } from './player'
 import { screenActive } from './screen'
 
@@ -202,7 +204,9 @@ const COMMANDS: Command[] = [
   ...PEOPLE_COMMANDS,
   ...ADMIN_COMMANDS,
   ...FUN_COMMANDS,
+  ...VISUALIZER_COMMANDS,
   ...GAME_COMMANDS,
+  ...SETTINGS_COMMANDS,
   {
     name: 'source', aliases: ['.'], group: 'Shell', usage: 'source [-y] [-k] <file>', path: 'any',
     description: 'Run the commands in a text file from the tree, one per line (# comments). Without -y it only shows them; -k keeps going past a failing line',
@@ -342,7 +346,7 @@ const COMMANDS: Command[] = [
   { name: 'version', group: 'Account', usage: 'version', description: 'The CLI version and the API it talks to', run: (_arg, sh) => sh.print(`unreleased-cli ${VERSION}\nAPI ${apiBase()}`) },
 ]
 
-const GROUPS: Group[] = ['Files', 'Library', 'Player', 'People', 'Admin', 'Fun', 'Shell', 'Account']
+const GROUPS: Group[] = ['Files', 'Library', 'Player', 'People', 'Admin', 'Fun', 'Settings', 'Shell', 'Account']
 
 function findCommand(word: string): Command | null {
   const name = word.trim().replace(/^\//, '').toLowerCase()
@@ -431,7 +435,7 @@ export class Shell {
 
   prompt(): string {
     const user = getToken() ? loadConfig().user?.name ?? 'user' : 'guest'
-    return `${color.green(`${user}@unreleased`)}:${color.blue(filesPathString(this.cwd))}$ `
+    return `${color.user(`${user}@unreleased`)}:${color.blue(filesPathString(this.cwd))}$ `
   }
 
   print(text: string, tone: Tone = 'plain'): void {

@@ -1,0 +1,19 @@
+{
+  "commit": "e56f23a5db3bb5bb9273ff5c809aa0f1f541e933",
+  "branch": "web-dev",
+  "uncommittedFiles": [
+    "src/renderer/src/lib/listeningPlays.ts"
+  ],
+  "files": [
+    "src/renderer/src/lib/fileTypes.ts",
+    "src/renderer/src/lib/format.ts",
+    "src/renderer/src/lib/heardle.ts",
+    "src/renderer/src/lib/listeningPlays.ts",
+    "src/renderer/src/lib/listeningStats.ts",
+    "src/renderer/src/lib/terminal/themeStore.ts",
+    "src/renderer/src/lib/terminal/types.ts",
+    "src/renderer/src/lib/terminalFileTools.ts",
+    "src/renderer/src/lib/versionsApi.ts",
+    "src/renderer/src/lib/wordle.ts"
+  ]
+}

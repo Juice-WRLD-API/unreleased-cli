@@ -126,4 +126,12 @@ declare module 'site:wordle' {
   export function shareText(dayKey: string, rows: LetterState[][], status: GameStatus, tries: number, puzzleNo: number): string
 }
 
+declare module 'site:termThemes' {
+  export interface TermTheme {
+    id: string; label: string; bg: string; fg: string; user: string; path: string
+    ok: string; err: string; dim: string; bar: string; border: string; accent: string
+  }
+  export const TERM_THEMES: TermTheme[]
+}
+
 declare const __VERSION__: string

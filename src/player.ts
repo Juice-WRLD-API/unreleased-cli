@@ -1,5 +1,6 @@
 import { streamUrl } from './api'
 import { findMpv, Mpv, MPV_MISSING, type MpvEvent } from './mpv'
+import { pref, setPref } from './prefs'
 
 // The play queue, the way the site's store/queueSlice.ts runs it: a list and
 // an index, repeat none/all/one, shuffle that reorders what's still to come
@@ -45,20 +46,37 @@ function fisherYates<T>(items: T[]): T[] {
 export class Player {
   queue: Track[] = []
   index = -1
-  shuffle = false
-  repeat: Repeat = 'none'
-  volume = 100
+  // The modes persist between sessions, as they do on the site (set / termtheme
+  // keep them in settings.json).
+  shuffle = pref<boolean>('shuffle', false)
+  private repeatMode: Repeat = pref<Repeat>('repeat', 'none')
+  volume = pref<number>('volume', 100)
   muted = false
-  speed = 1
+  speed = pref<number>('speed', 1)
+  /** Let the pitch follow the speed (off: mpv corrects it). */
+  pitchShift = pref<boolean>('pitch-shift', false)
   sleepEnd: number | null = null
   private sleepTimer: NodeJS.Timeout | null = null
   private mpv: Mpv | null = null
   private starting: Promise<Mpv> | null = null
   /** Waiting on the file being loaded; it gets mpv's events first. */
   private loadWaiter: ((e: MpvEvent) => boolean) | null = null
+  /** Called once per play that has been listened to (see credit). */
+  onCredit: ((track: Track) => void) | null = null
+  /** The track mpv has open now: position updates before its file-loaded
+   *  still belong to the previous song and must not count for this one. */
+  private loadedTrack: Track | null = null
+  private mpvDuration = 0
+  private credited: Track | null = null
 
   /** `notify` prints something that happened on its own (next track, an error). */
   constructor(private readonly notify: (text: string, tone?: 'ok' | 'error' | 'dim') => void) {}
+
+  get repeat(): Repeat { return this.repeatMode }
+  set repeat(mode: Repeat) {
+    this.repeatMode = mode
+    setPref('repeat', mode)
+  }
 
   get current(): Track | null { return this.queue[this.index] ?? null }
   get running(): boolean { return !!this.mpv?.alive }
@@ -73,6 +91,9 @@ export class Player {
       await mpv.set('volume', this.volume)
       await mpv.set('mute', this.muted)
       await mpv.set('speed', this.speed)
+      await mpv.set('audio-pitch-correction', !this.pitchShift)
+      await mpv.command('observe_property', 1, 'time-pos')
+      await mpv.command('observe_property', 2, 'duration')
       this.mpv = mpv
       return mpv
     })().finally(() => { this.starting = null })
@@ -85,6 +106,7 @@ export class Player {
   }
 
   private onEvent(e: MpvEvent): void {
+    if (e.event === 'property-change') { this.onProperty(e); return }
     if (this.loadWaiter?.(e)) return
     // A song replaced by loadfile ends with reason 'stop', which isn't an ending.
     if (e.event !== 'end-file') return
@@ -95,6 +117,27 @@ export class Player {
     } else if (e.reason === 'eof') {
       void this.autoNext(true)
     }
+  }
+
+  private onProperty(e: MpvEvent): void {
+    if (e.name === 'duration') this.mpvDuration = Number(e.data) || 0
+    else if (e.name === 'time-pos') this.credit(Number(e.data))
+  }
+
+  /** Counts a play once the song has actually been listened to - 30 seconds in,
+   *  or halfway through anything shorter - the way the site's player does
+   *  (Player.tsx, creditPlayIfListened). Skipping through a queue doesn't count.
+   *  Back at the start of a song that already counted (repeat one, a seek back)
+   *  it can count again. Files from the tree have no song id and never count. */
+  private credit(position: number): void {
+    const track = this.loadedTrack
+    if (!track || track.songId === undefined || !Number.isFinite(position)) return
+    if (this.credited === track && position < 1) this.credited = null
+    if (this.credited === track) return
+    const length = this.mpvDuration || track.duration
+    if (length <= 0 || position < Math.min(30, length / 2)) return
+    this.credited = track
+    this.onCredit?.(track)
   }
 
   /** Moves on by itself after a song ends. A song that won't load is skipped,
@@ -116,6 +159,8 @@ export class Player {
     const mpv = await this.engine()
     this.index = i
     const track = this.queue[i]
+    this.loadedTrack = null
+    this.mpvDuration = 0
     const opened = new Promise<void>((resolve, reject) => {
       const done = (): void => { clearTimeout(timer); this.loadWaiter = null }
       // A slow stream isn't an error; stop waiting and let it start when it can.
@@ -137,6 +182,7 @@ export class Player {
       throw err
     }
     await opened
+    this.loadedTrack = track
     await mpv.set('pause', false)
     return track
   }
@@ -213,6 +259,7 @@ export class Player {
       this.queue = [...played, ...fisherYates(this.queue.slice(this.index + 1))]
     }
     this.shuffle = on
+    setPref('shuffle', on)
   }
 
   async paused(): Promise<boolean> {
@@ -249,6 +296,7 @@ export class Player {
 
   async setVolume(v: number): Promise<void> {
     this.volume = Math.max(0, Math.min(100, Math.round(v)))
+    setPref('volume', this.volume)
     if (this.mpv?.alive) await this.mpv.set('volume', this.volume)
   }
 
@@ -259,7 +307,14 @@ export class Player {
 
   async setSpeed(s: number): Promise<void> {
     this.speed = s
+    setPref('speed', s)
     if (this.mpv?.alive) await this.mpv.set('speed', s)
+  }
+
+  async setPitchShift(on: boolean): Promise<void> {
+    this.pitchShift = on
+    setPref('pitch-shift', on)
+    if (this.mpv?.alive) await this.mpv.set('audio-pitch-correction', !on)
   }
 
   setSleep(minutes: number | null): void {
@@ -281,6 +336,7 @@ export class Player {
   stop(): void {
     this.queue = []
     this.index = -1
+    this.loadedTrack = null
     this.setSleep(null)
     this.mpv?.stop()
     this.mpv = null
