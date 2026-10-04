@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+# dist/unreleased.mjs is built before the source upload (scripts/ppa.sh);
+# Launchpad builders have no network, so nothing is built here.
+override_dh_auto_build:
+override_dh_auto_test:
+
+override_dh_auto_install:
+	install -D -m 0644 dist/unreleased.mjs debian/unreleased-cli/usr/lib/unreleased-cli/unreleased.mjs
+	install -d debian/unreleased-cli/usr/bin
+	printf '#!/bin/sh\nexec node /usr/lib/unreleased-cli/unreleased.mjs "$$@"\n' > debian/unreleased-cli/usr/bin/unreleased
+	chmod 0755 debian/unreleased-cli/usr/bin/unreleased

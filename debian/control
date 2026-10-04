@@ -1,0 +1,16 @@
+Source: unreleased-cli
+Section: sound
+Priority: optional
+Maintainer: saint <freakypallet@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/Juice-WRLD-API/unreleased-cli
+Rules-Requires-Root: no
+
+Package: unreleased-cli
+Architecture: all
+Depends: nodejs (>= 18), ${misc:Depends}
+Recommends: mpv
+Description: The Unreleased site terminal as a command-line shell
+ Browse the Unreleased site's channels as a folder tree, search, download
+ and play tracks from the terminal. Playback needs mpv.

@@ -13,6 +13,21 @@ saved 44 files (25.9 MB) to covers
 
 ## Install
 
+From npm (any OS, Node 20 or newer):
+
+```
+npm install -g unreleased-cli
+```
+
+On Ubuntu (PPA, Node 18 or newer):
+
+```
+sudo add-apt-repository ppa:saint-duckworth/unreleased-cli
+sudo apt install unreleased-cli
+```
+
+From source:
+
 ```
 npm install
 npm run build
