@@ -238,7 +238,7 @@ export const FUN_COMMANDS: Command[] = [
       if (!m) fail('usage: watch [-n seconds] <command>')
       const seconds = Math.min(300, Math.max(1, m![1] ? Number(m![1]) : 2))
       const command = m![2].trim().replace(/^(["'])([\s\S]*)\1$/, '$2')
-      if (/^(watch|matrix|visualizer|viz|wordle|heardle|login|source|\.)\b/i.test(command)) fail(`watch: ${command.split(/\s+/)[0]} can’t run inside watch`)
+      if (/^(watch|matrix|visualizer|viz|karaoke|lyrics|wordle|heardle|login|source|\.)\b/i.test(command)) fail(`watch: ${command.split(/\s+/)[0]} can’t run inside watch`)
       needScreen(sh, 'watch')
       const { body, settle } = watchScreen(sh, command, seconds)
       await openScreen(body)

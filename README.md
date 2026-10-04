@@ -53,7 +53,7 @@ Commands (type `help <command>` in the shell for the details of each one):
 - **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
 - **People:** `user`, `lookup`
 - **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
-- **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `wordle`, `heardle`
+- **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
 - **Settings:** `set`, `settings`, `termtheme`
 - **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `exit`, `help`
 - **Account:** `login`, `logout`, `whoami`, `version`
@@ -127,10 +127,11 @@ These cover the Admin page's review queues and site moderation, using the same e
 - `juicesay [text]` has a juice box say it.
 - `matrix` is digital rain. Any key leaves.
 - `visualizer` (or `viz`) is a live spectrum of the song that's playing. Any key leaves. mpv can't hand its audio over, so a second mpv decodes the same stream to a temp file and the bars come from that, which means the song is downloaded a second time while the screen is open.
+- `karaoke` (or `lyrics`) shows the lyrics of the song that's playing. Synced lyrics highlight the line being sung and scroll along; plain ones scroll with the arrow keys and Page Up/Down. Space pauses, `q` leaves. It needs a song from the library (not a file played from the tree).
 - `wordle [daily | unlimited]` is the song-title Wordle, using the site's own puzzle logic, so the daily puzzle is the same one. Type a title and press Enter. Esc leaves, and your progress is saved.
 - `heardle` gives practice rounds: Tab plays the clip, Enter guesses (an empty Enter skips), and ↑↓ picks a suggestion. The clip plays through its own mpv. Music that was playing gets paused, and `play` resumes it.
 
-`matrix`, `visualizer`, `wordle`, `heardle` and `watch` take over the whole terminal, then hand it back as it was. They need an interactive terminal, so they won't run from a pipe or a script.
+`matrix`, `visualizer`, `karaoke`, `wordle`, `heardle` and `watch` take over the whole terminal, then hand it back as it was. They need an interactive terminal, so they won't run from a pipe or a script.
 
 Wordle and Heardle keep their progress, streaks and song lists in `~/.unreleased/storage.json`. That's separate from your browser's, the same way two browsers are separate. They use the default game settings, because the settings you change on the site are stored in your browser.
 

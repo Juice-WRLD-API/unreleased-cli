@@ -14,6 +14,7 @@ import { color, writeTone, type Tone } from './out'
 import { PEOPLE_COMMANDS } from './people'
 import { PLAYER_COMMANDS } from './playback'
 import { SETTINGS_COMMANDS } from './settings'
+import { KARAOKE_COMMANDS } from './karaoke'
 import { VISUALIZER_COMMANDS } from './visualizer'
 import type { Player } from './player'
 import { screenActive } from './screen'
@@ -205,6 +206,7 @@ const COMMANDS: Command[] = [
   ...ADMIN_COMMANDS,
   ...FUN_COMMANDS,
   ...VISUALIZER_COMMANDS,
+  ...KARAOKE_COMMANDS,
   ...GAME_COMMANDS,
   ...SETTINGS_COMMANDS,
   {
