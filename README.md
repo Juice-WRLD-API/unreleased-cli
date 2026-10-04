@@ -54,7 +54,7 @@ Commands (type `help <command>` in the shell for the details of each one):
 - **Library:** `find`, `song`, `like`, `unlike`, `liked`, `playlists`, `playlist`, `stats`
 - **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `eq`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
 - **People:** `user`, `lookup`
-- **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
+- **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
 - **Settings:** `set`, `settings`, `termtheme`
 - **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `exit`, `help`
@@ -119,6 +119,7 @@ These cover the Admin page's review queues and site moderation, using the same e
 - `reverse [song|comp] <id>` undoes an approved proposal.
 - `users [role] [filter]` lists accounts. `user <name>` shows one person.
 - `sitebans` lists active site-wide bans, mutes and timeouts. `siteunban <user | #id>` lifts them.
+- `cdn` shows the CDN stats and every node, pending ones first. `cdn <node>` shows one in full, where a node is its id, the start of the id, or its name. `cdn approve|revoke|enable|disable|reset|restore|delete <node>` does what the Admin page's CDN nodes tab does. `restore` is for a node the server pulled for hash violations: it switches it back on and resets its trust and violations. `delete` asks first unless you pass `-y`.
 
 `reverse` and `siteunban` ask before they act. Outside the interactive shell, such as in one-shot use or a script, they need `-y` instead.
 

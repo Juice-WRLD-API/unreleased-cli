@@ -15,6 +15,7 @@ import { PEOPLE_COMMANDS } from './people'
 import { PLAYER_COMMANDS } from './playback'
 import { SETTINGS_COMMANDS } from './settings'
 import { UPDATE_COMMANDS } from './update'
+import { CDN_COMMANDS } from './cdn'
 import { EQ_COMMANDS } from './eq'
 import { KARAOKE_COMMANDS } from './karaoke'
 import { VISUALIZER_COMMANDS } from './visualizer'
@@ -207,6 +208,7 @@ const COMMANDS: Command[] = [
   ...EQ_COMMANDS,
   ...PEOPLE_COMMANDS,
   ...ADMIN_COMMANDS,
+  ...CDN_COMMANDS,
   ...FUN_COMMANDS,
   ...VISUALIZER_COMMANDS,
   ...KARAOKE_COMMANDS,

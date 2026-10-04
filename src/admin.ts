@@ -95,12 +95,12 @@ const REVIEW_PATH: Record<Kind, string> = { song: 'proposals', comp: 'comp-propo
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const oneLine = (s: string | null | undefined, max = 70): string => {
+export const oneLine = (s: string | null | undefined, max = 70): string => {
   const t = (s ?? '').replace(/\s+/g, ' ').trim()
   return t.length > max ? `${t.slice(0, max - 1)}…` : t
 }
 
-function relativeTime(iso: string | null): string {
+export function relativeTime(iso: string | null): string {
   if (!iso) return '—'
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (m < 1) return 'just now'
@@ -129,7 +129,7 @@ function parseReviewArgs(args: string, usage: string): { kind: Kind; id: number;
   return { kind, id, notes: words.join(' '), yes }
 }
 
-async function confirm(sh: Shell, question: string, yes: boolean, cmd: string): Promise<boolean> {
+export async function confirm(sh: Shell, question: string, yes: boolean, cmd: string): Promise<boolean> {
   if (yes) return true
   if (!process.stdin.isTTY) fail(`${cmd}: add -y to do this without being asked`)
   const answer = await sh.ask(`${question} [y/N] `)
@@ -147,10 +147,10 @@ async function review(kind: Kind, id: number, action: 'approve' | 'reject', note
   return `application #${id} ${r.status}: ${oneLine(r.display_name || r.username)}`
 }
 
-const kindComplete = (kinds: readonly string[]) => async (arg: string): Promise<string[]> =>
+export const kindComplete = (kinds: readonly string[]) => async (arg: string): Promise<string[]> =>
   (/\s/.test(arg.trim()) ? [] : kinds.filter((s) => s.startsWith(arg.trim().toLowerCase())))
 
-const admin = (run: Command['run']): Command['run'] => async (args, sh) => { await needAdmin(); await run(args, sh) }
+export const admin = (run: Command['run']): Command['run'] => async (args, sh) => { await needAdmin(); await run(args, sh) }
 
 // ─── The commands ────────────────────────────────────────────────────────────
 
