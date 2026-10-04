@@ -1,6 +1,7 @@
 import { createInterface, type Interface } from 'node:readline'
 import { getToken, HISTORY_MAX, loadConfig, readRc } from './config'
 import { historySearchActive, installHistorySearch } from './historySearch'
+import { installHotkeys } from './hotkeys'
 import { color, writeTone, type Tone } from './out'
 import { Player } from './player'
 import { flushPlays, recordPlay } from './plays'
@@ -75,6 +76,7 @@ export async function startRepl(): Promise<boolean> {
   // account's listening history on the site.
   shell.player.onCredit = (track) => recordPlay(track, (text) => notify(text, 'error'))
   installHistorySearch(rl, () => shell.history, () => !running, flushHeld)
+  installHotkeys(rl, () => shell.player, notify, () => !screenActive() && !historySearchActive())
   const stopMusic = (): void => shell.player?.shutdown()
   process.on('exit', stopMusic)
   process.on('SIGHUP', () => { stopMusic(); process.exit(129) })

@@ -17,6 +17,7 @@ import { SETTINGS_COMMANDS } from './settings'
 import { UPDATE_COMMANDS } from './update'
 import { CDN_COMMANDS } from './cdn'
 import { EQ_COMMANDS } from './eq'
+import { HOTKEY_COMMANDS } from './hotkeys'
 import { KARAOKE_COMMANDS } from './karaoke'
 import { VISUALIZER_COMMANDS } from './visualizer'
 import type { Player } from './player'
@@ -214,6 +215,7 @@ const COMMANDS: Command[] = [
   ...KARAOKE_COMMANDS,
   ...GAME_COMMANDS,
   ...SETTINGS_COMMANDS,
+  ...HOTKEY_COMMANDS,
   ...UPDATE_COMMANDS,
   {
     name: 'source', aliases: ['.'], group: 'Shell', usage: 'source [-y] [-k] <file>', path: 'any',

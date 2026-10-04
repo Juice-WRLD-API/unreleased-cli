@@ -52,6 +52,11 @@ const SETTINGS: Setting[] = [
     set: (sh, v) => (sh.player ? sh.player.setSpeed(Number(v)) : setPref('speed', Number(v))),
   },
   {
+    key: 'hotkey-seek', desc: 'Seconds the skip shortcuts jump (see bind)', kind: 'number', min: 1, max: 120, unit: 's',
+    get: () => pref('hotkey-seek', 10),
+    set: (_sh, v) => setPref('hotkey-seek', Number(v)),
+  },
+  {
     key: 'repeat', desc: 'What happens at the end of the queue', kind: 'enum',
     options: () => REPEATS.map((value) => ({ value, label: value })),
     get: (sh) => sh.player?.repeat ?? pref('repeat', 'none'),

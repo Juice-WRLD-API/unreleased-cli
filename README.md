@@ -56,7 +56,7 @@ Commands (type `help <command>` in the shell for the details of each one):
 - **People:** `user`, `lookup`
 - **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
-- **Settings:** `set`, `settings`, `termtheme`
+- **Settings:** `set`, `settings`, `bind`, `termtheme`
 - **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `reload`, `exit`, `help`
 - **Account:** `login`, `logout`, `whoami`, `version`
 
@@ -155,6 +155,25 @@ Wordle and Heardle keep their progress, streaks and song lists in `~/.unreleased
 `full` asks the terminal window to go fullscreen, and to leave again. It sends the xterm request for that, which many terminals ignore (Windows Terminal does), so F11 is the fallback.
 
 `reload` (or `restart`) closes the shell and starts a fresh one, so a version installed by `update` is the one that runs, and your settings and rc file are read again. It only works in the interactive shell, and music stops.
+
+## Shortcuts
+
+The player has keyboard shortcuts at the prompt, so you can seek or change the volume without typing a command. They use the site's action names and key format (Settings > Shortcuts there), and a message above the prompt says what they did.
+
+| Keys | Does |
+|---|---|
+| Shift+← / Shift+→ | Skip back / forward (10 seconds, or `set hotkey-seek`) |
+| Ctrl+← / Ctrl+→ | Previous / next track |
+| Ctrl+↑ / Ctrl+↓ | Volume up / down |
+| Alt+P | Play / pause |
+| Alt+M | Mute |
+| Alt+S, Alt+R | Shuffle, cycle repeat |
+| Alt+L | Like the song |
+| Alt+. / Alt+, | Speed up / down |
+
+`bind` lists them. `bind seek-forward alt+right` changes one, `bind mute none` clears one, `bind reset` puts them all back, and `bind alt+p` says what a key does. Giving a key that's already used to another action moves it. Any action can take a key, including `seek-0` to `seek-90`, which jump to that percentage and have none by default.
+
+Keys the line editor needs for typing can't be bound: Ctrl+letters, Alt+B, Alt+F and Alt+D. A bare key only works on an empty line, so the arrow keys, Home and the F-keys can be shortcuts without getting in the way. Your terminal may keep some combos for itself (Windows Terminal uses Alt+arrows, for one).
 
 ## Signing in
 
