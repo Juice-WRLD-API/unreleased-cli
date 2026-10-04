@@ -57,7 +57,7 @@ Commands (type `help <command>` in the shell for the details of each one):
 - **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
 - **Settings:** `set`, `settings`, `termtheme`
-- **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `exit`, `help`
+- **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `reload`, `exit`, `help`
 - **Account:** `login`, `logout`, `whoami`, `version`
 
 Things that work the same as on the site:
@@ -153,6 +153,8 @@ Wordle and Heardle keep their progress, streaks and song lists in `~/.unreleased
 `termtheme [name]` lists the colour schemes (the site's own list, so a new one there turns up here after the next sync and build) or switches to one. A scheme colours the prompt, messages, rain and visualizer in truecolor, and the default one uses your terminal's own palette. It can't change the terminal's background.
 
 `full` asks the terminal window to go fullscreen, and to leave again. It sends the xterm request for that, which many terminals ignore (Windows Terminal does), so F11 is the fallback.
+
+`reload` (or `restart`) closes the shell and starts a fresh one, so a version installed by `update` is the one that runs, and your settings and rc file are read again. It only works in the interactive shell, and music stops.
 
 ## Signing in
 

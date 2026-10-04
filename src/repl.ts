@@ -29,7 +29,8 @@ function replPrompter(rl: RawInterface): Prompter {
   }
 }
 
-export async function startRepl(): Promise<void> {
+/** Runs the shell until it's left; true when it was left by `reload`. */
+export async function startRepl(): Promise<boolean> {
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -113,4 +114,5 @@ export async function startRepl(): Promise<void> {
   stopMusic()
   // Play counts from the last few seconds are still waiting to be written.
   await Promise.race([flushPlays(), new Promise((resolve) => setTimeout(resolve, 4000).unref())])
+  return shell.reloading
 }

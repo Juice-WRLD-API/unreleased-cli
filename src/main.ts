@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { VERSION } from './api'
 import { startRepl } from './repl'
@@ -70,8 +71,10 @@ async function main(): Promise<number> {
   if (args[0] === '-v' || args[0] === '--version') { process.stdout.write(`unreleased-cli ${VERSION}\n`); return 0 }
 
   if (args.length === 0 && process.stdin.isTTY) {
-    await startRepl()
-    return 0
+    if (!(await startRepl())) return 0
+    // reload: a fresh process, so a version installed meanwhile is the one that runs.
+    const again = spawnSync(process.execPath, [...process.execArgv, process.argv[1]], { stdio: 'inherit' })
+    return again.status ?? 1
   }
 
   const shell = new Shell(oneShotPrompter(), false)

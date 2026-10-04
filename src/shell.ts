@@ -269,6 +269,14 @@ const COMMANDS: Command[] = [
   },
   { name: 'exit', aliases: ['quit'], group: 'Shell', usage: 'exit', description: 'Leave the shell', run: (_arg, sh) => { sh.exiting = true } },
   {
+    name: 'reload', aliases: ['restart'], group: 'Shell', usage: 'reload', description: 'Restart the shell (picks up a new version after update, and re-reads your settings and rc file). Music stops',
+    run: (_a, sh) => {
+      if (!sh.player) fail('reload: only the interactive shell can restart')
+      sh.reloading = true
+      sh.exiting = true
+    },
+  },
+  {
     name: 'help', aliases: ['man'], group: 'Shell', usage: 'help [command]', description: 'List the commands, or explain one',
     run: (arg, sh) => {
       const topic = arg.trim()
@@ -389,6 +397,8 @@ export class Shell {
   readonly history: string[]
   readonly aliases: Record<string, string>
   exiting = false
+  /** Leaving to start the shell again (reload). */
+  reloading = false
   /** The music player; only the interactive shell has one (it stops with it). */
   player: Player | null = null
   private errors = 0
