@@ -97,7 +97,7 @@ Music plays through a hidden mpv that the interactive shell starts the first tim
 - `playlist play <name>`, `playlist shuffle <name>`, `liked play` and `shuffle <era> [count]` replace the queue.
 - `queue add` and `queue next` add to it. `queue` lists it, and `remove N` / `jump N` change it.
 - Shuffle, repeat, previous and the end of the queue behave as they do on the site.
-- `status` (or `now`) shows the song, a progress bar, the settings and the queue.
+- `status` (or `now`) shows the song, a progress bar, the settings and the queue, and follows along live on a terminal (`q` leaves). `status -1` prints it once, and it does too when piped or run in a script.
 - `like` and `unlike` with no song act on the one playing.
 
 The music stops when you leave the shell, so `unreleased play …` on its own says to open the shell instead. If the shell is killed without a chance to stop mpv (for example the terminal window is closed), mpv quits by itself within about 10 seconds.

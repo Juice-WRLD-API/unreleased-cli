@@ -1,4 +1,5 @@
 import { AUDIO_EXTS, getFileExt } from 'site:fileTypes'
+import { canOpenScreen } from './screen'
 import { clock, parseBool, pickByName } from 'site:termTypes'
 import { fail, plural, type Command } from './command'
 import { listDir, lookupEntry, unquote } from './files'
@@ -252,9 +253,12 @@ export const PLAYER_COMMANDS: Command[] = [
     },
   },
   {
-    name: 'status', aliases: ['now', 'np'], group: 'Player', usage: 'status', description: 'What is playing, plus volume, speed, shuffle, repeat and the queue',
-    run: async (_a, sh) => {
+    name: 'status', aliases: ['now', 'np'], group: 'Player', usage: 'status [-1]', description: 'What is playing, plus volume, speed, shuffle, repeat and the queue. Live on a terminal (q leaves); -1 prints it once',
+    run: async (args, sh) => {
       const p = playerOf(sh)
+      // On a terminal it follows along (the watch screen, every second); piped,
+      // in a script, inside watch or with -1 it prints once.
+      if (!sh.scripted && canOpenScreen() && args.trim() !== '-1') { await sh.execLine('watch -n 1 status -1'); return }
       const t = p.current
       const [paused, pos, dur] = await Promise.all([p.paused(), p.position(), p.duration()])
       sh.print([
