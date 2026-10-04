@@ -7,7 +7,7 @@ set -e
 
 SRC=/media/sf_Unreleased/unreleased-cli
 WORK=$HOME/unreleased-cli
-PPA=ppa:saint-duckworth/unreleased-cli
+PPA=ppa:saint-duckworth/ppa
 export DEBSIGN_KEYID=8246516ADCA892F1
 
 new=$1

@@ -22,7 +22,7 @@ npm install -g unreleased-cli
 On Ubuntu (PPA, Node 18 or newer):
 
 ```
-sudo add-apt-repository ppa:saint-duckworth/unreleased-cli
+sudo add-apt-repository ppa:saint-duckworth/ppa
 sudo apt install unreleased-cli
 ```
 
