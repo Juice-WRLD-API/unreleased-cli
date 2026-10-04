@@ -1,18 +1,31 @@
 {
-  "commit": "e56f23a5db3bb5bb9273ff5c809aa0f1f541e933",
+  "commit": "c3b21cf208626fad8b231ee7b0920fa95de69d93",
   "branch": "web-dev",
   "uncommittedFiles": [
-    "src/renderer/src/lib/listeningPlays.ts"
+    "src/renderer/src/lib/juicewrldApi.ts",
+    "src/renderer/src/lib/terminalFileTools.ts"
   ],
   "files": [
+    "src/renderer/src/lib/activeChannelState.ts",
+    "src/renderer/src/lib/apiCache.ts",
+    "src/renderer/src/lib/apiClient.ts",
+    "src/renderer/src/lib/apiServers.ts",
+    "src/renderer/src/lib/coverRotation.ts",
+    "src/renderer/src/lib/eraCovers.ts",
     "src/renderer/src/lib/fileTypes.ts",
     "src/renderer/src/lib/format.ts",
     "src/renderer/src/lib/heardle.ts",
+    "src/renderer/src/lib/juicewrldApi.ts",
     "src/renderer/src/lib/listeningPlays.ts",
     "src/renderer/src/lib/listeningStats.ts",
+    "src/renderer/src/lib/persist.ts",
+    "src/renderer/src/lib/sessionEditLinksMirror.ts",
+    "src/renderer/src/lib/sessionEditOverrides.ts",
+    "src/renderer/src/lib/songPrefs.ts",
     "src/renderer/src/lib/terminal/themeStore.ts",
     "src/renderer/src/lib/terminal/types.ts",
     "src/renderer/src/lib/terminalFileTools.ts",
+    "src/renderer/src/lib/ttlCache.ts",
     "src/renderer/src/lib/versionsApi.ts",
     "src/renderer/src/lib/wordle.ts"
   ]
