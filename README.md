@@ -52,7 +52,7 @@ Commands (type `help <command>` in the shell for the details of each one):
 
 - **Files:** `cd`, `ls`, `pwd`, `lcd`, `get`, `cat`, `head`, `tail`, `wc`, `grep`, `locate`, `tree`, `du`
 - **Library:** `find`, `song`, `like`, `unlike`, `liked`, `playlists`, `playlist`, `stats`
-- **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
+- **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `eq`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
 - **People:** `user`, `lookup`
 - **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
@@ -130,6 +130,7 @@ These cover the Admin page's review queues and site moderation, using the same e
 - `matrix` is digital rain. Any key leaves.
 - `visualizer` (or `viz`) is a live spectrum of the song that's playing. Any key leaves. mpv can't hand its audio over, so a second mpv decodes the same stream to a temp file and the bars come from that, which means the song is downloaded a second time while the screen is open.
 - `karaoke` (or `lyrics`) shows the lyrics of the song that's playing. Synced lyrics highlight the line being sung and scroll along; plain ones scroll with the arrow keys and Page Up/Down. Space pauses, `q` leaves. It needs a song from the library (not a file played from the tree).
+- `eq` shows the equalizer settings. `eq list` names the presets (the site's own), `eq rock` turns the equalizer on with one, and `eq off` / `eq reset` switch it off or flatten it. `eq boost 100-200`, `eq balance -100..100`, `eq speed 0.5-2` and `eq pitch [on|off]` (the same as the `speed` command and the `pitch-shift` setting), `eq mono [on|off]` and `eq reverb [on|off|0-100] [decay 1-8]` do the rest. It runs through mpv's audio filters, so the reverb is an echo approximation of the site's. Settings carry over between sessions, and changes apply to the song that's playing.
 - `wordle [daily | unlimited]` is the song-title Wordle, using the site's own puzzle logic, so the daily puzzle is the same one. Type a title and press Enter. Esc leaves, and your progress is saved.
 - `heardle` gives practice rounds: Tab plays the clip, Enter guesses (an empty Enter skips), and ↑↓ picks a suggestion. The clip plays through its own mpv. Music that was playing gets paused, and `play` resumes it.
 

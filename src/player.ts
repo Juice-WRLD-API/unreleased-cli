@@ -1,3 +1,4 @@
+import { filterChain } from './effects'
 import { streamUrl } from './api'
 import { findMpv, Mpv, MPV_MISSING, type MpvEvent } from './mpv'
 import { pref, setPref } from './prefs'
@@ -92,6 +93,8 @@ export class Player {
       await mpv.set('mute', this.muted)
       await mpv.set('speed', this.speed)
       await mpv.set('audio-pitch-correction', !this.pitchShift)
+      const chain = filterChain()
+      if (chain) await mpv.set('af', chain)
       await mpv.command('observe_property', 1, 'time-pos')
       await mpv.command('observe_property', 2, 'duration')
       this.mpv = mpv
@@ -309,6 +312,11 @@ export class Player {
     this.speed = s
     setPref('speed', s)
     if (this.mpv?.alive) await this.mpv.set('speed', s)
+  }
+
+  /** Swaps the audio-filter chain (the equalizer and effects) while playing. */
+  async setFilter(chain: string): Promise<void> {
+    if (this.mpv?.alive) await this.mpv.set('af', chain)
   }
 
   async setPitchShift(on: boolean): Promise<void> {

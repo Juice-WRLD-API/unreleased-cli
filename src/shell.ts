@@ -15,6 +15,7 @@ import { PEOPLE_COMMANDS } from './people'
 import { PLAYER_COMMANDS } from './playback'
 import { SETTINGS_COMMANDS } from './settings'
 import { UPDATE_COMMANDS } from './update'
+import { EQ_COMMANDS } from './eq'
 import { KARAOKE_COMMANDS } from './karaoke'
 import { VISUALIZER_COMMANDS } from './visualizer'
 import type { Player } from './player'
@@ -203,6 +204,7 @@ const COMMANDS: Command[] = [
   { name: 'du', group: 'Files', usage: 'du [folder]', path: 'dir', description: 'How much is in each subfolder, and in total', run: fileTool(diskUsage) },
   ...LIBRARY_COMMANDS,
   ...PLAYER_COMMANDS,
+  ...EQ_COMMANDS,
   ...PEOPLE_COMMANDS,
   ...ADMIN_COMMANDS,
   ...FUN_COMMANDS,
