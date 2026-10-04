@@ -9,7 +9,7 @@ Rules-Requires-Root: no
 
 Package: unreleased-cli
 Architecture: all
-Depends: nodejs (>= 18), ${misc:Depends}
+Depends: nodejs (>= 20), ${misc:Depends}
 Recommends: mpv
 Description: The Unreleased site terminal as a command-line shell
  Browse the Unreleased site's channels as a folder tree, search, download

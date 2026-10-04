@@ -19,7 +19,7 @@ From npm (any OS, Node 20 or newer):
 npm install -g unreleased-cli
 ```
 
-On Ubuntu (PPA, Node 18 or newer):
+On Ubuntu (PPA; needs Node 20 or newer, which Ubuntu 26.04 has and 24.04 needs from NodeSource):
 
 ```
 sudo add-apt-repository ppa:saint-duckworth/ppa
