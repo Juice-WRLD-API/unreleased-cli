@@ -26,6 +26,8 @@ sudo add-apt-repository ppa:saint-duckworth/ppa
 sudo apt install unreleased-cli
 ```
 
+To update later, run `unreleased update` (or `update` inside the shell). It checks for a newer version and installs it if you installed from npm; `update -c` only checks.
+
 From source:
 
 ```

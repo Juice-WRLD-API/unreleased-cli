@@ -14,6 +14,7 @@ import { color, writeTone, type Tone } from './out'
 import { PEOPLE_COMMANDS } from './people'
 import { PLAYER_COMMANDS } from './playback'
 import { SETTINGS_COMMANDS } from './settings'
+import { UPDATE_COMMANDS } from './update'
 import { KARAOKE_COMMANDS } from './karaoke'
 import { VISUALIZER_COMMANDS } from './visualizer'
 import type { Player } from './player'
@@ -209,6 +210,7 @@ const COMMANDS: Command[] = [
   ...KARAOKE_COMMANDS,
   ...GAME_COMMANDS,
   ...SETTINGS_COMMANDS,
+  ...UPDATE_COMMANDS,
   {
     name: 'source', aliases: ['.'], group: 'Shell', usage: 'source [-y] [-k] <file>', path: 'any',
     description: 'Run the commands in a text file from the tree, one per line (# comments). Without -y it only shows them; -k keeps going past a failing line',
