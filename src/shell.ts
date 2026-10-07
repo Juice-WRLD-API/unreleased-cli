@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { catFile, diskUsage, grepFiles, headTailFile, locateName, treeView, wcFile } from 'site:fileTools'
-import { accountName, accountRole, apiBase, describeError, getMe, isAbortError, isHttpUrl, normalizePrefix, passwordLogin, routeRules, setActiveSignal, stripSlash, VERSION } from './api'
+import { accountName, accountRole, apiBase, clearLastFailure, describeError, getLastFailure, getMe, isAbortError, isHttpUrl, normalizePrefix, passwordLogin, routeRules, setActiveSignal, stripSlash, VERSION } from './api'
 import { getToken, HISTORY_MAX, loadAliases, loadConfig, loadHistory, saveAliases, saveConfig, saveHistory } from './config'
 import { ADMIN_COMMANDS } from './admin'
 import { fail, type Command, type Group } from './command'
@@ -263,6 +263,22 @@ const BASE_COMMANDS: Command[] = [
       if (!Number.isInteger(n) || n < 0) fail('usage: history [N | -c]')
       const start = Math.max(0, sh.history.length - n)
       sh.print(sh.history.slice(start).map((h, i) => `${String(start + i + 1).padStart(5)}  ${h}`).join('\n') || '(empty)', sh.history.length ? 'plain' : 'dim')
+    },
+  },
+  {
+    name: 'error', aliases: ['lasterror'], group: 'Shell', usage: 'error [-c]', description: 'Show the last failed request in full: URL, status and the server\'s reply. -c forgets it',
+    run: (arg, sh) => {
+      if (arg.trim() === '-c') { clearLastFailure(); sh.print('error cleared', 'ok'); return }
+      const f = getLastFailure()
+      if (!f) { sh.print('no failed request this session', 'dim'); return }
+      const lines = [
+        `time     ${f.at.toLocaleString()}`,
+        `request  ${f.method} ${f.url}`,
+        ...(f.status !== undefined ? [`status   ${f.status}${f.statusText ? ` ${f.statusText}` : ''}`] : []),
+        `error    ${f.message}`,
+      ]
+      if (f.body) lines.push('', 'response body:', f.body)
+      sh.print(lines.join('\n'))
     },
   },
   { name: 'echo', group: 'Shell', usage: 'echo <text>', description: 'Print text', run: (arg, sh) => sh.print(unquote(arg)) },

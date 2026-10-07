@@ -54,8 +54,21 @@ function headers(token: string | null, json: boolean): Record<string, string> {
   }
 }
 
+/** The last request that failed, kept whole for the `error` command. */
+export interface FailedRequest { at: Date; method: string; url: string; status?: number; statusText?: string; body?: string; message: string }
+let lastFailure: FailedRequest | null = null
+export const getLastFailure = (): FailedRequest | null => lastFailure
+export const clearLastFailure = (): void => { lastFailure = null }
+
 /** The server's own words for a failed request, when it sent any. */
-async function errorText(res: Response): Promise<string> {
+async function errorText(res: Response, method: string, url: string): Promise<string> {
+  const raw = await res.clone().text().catch(() => '')
+  const message = await summarize(res)
+  lastFailure = { at: new Date(), method, url, status: res.status, statusText: res.statusText, body: raw, message }
+  return message
+}
+
+async function summarize(res: Response): Promise<string> {
   let detail = ''
   try {
     const body = await res.json() as Record<string, unknown>
@@ -83,13 +96,24 @@ export function apiUrl(path: string, params: Record<string, string | number | nu
 
 export async function apiFetch<T>(path: string, params: Record<string, string | number | null | undefined> = {}, opts: RequestOptions = {}): Promise<T> {
   const token = opts.token === undefined ? getToken() : opts.token
-  const res = await fetch(apiUrl(path, params), {
-    method: opts.method ?? 'GET',
-    headers: headers(token, opts.body !== undefined),
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-    signal: opts.detached ? undefined : activeSignal,
-  })
-  if (!res.ok) throw new Error(await errorText(res))
+  const url = apiUrl(path, params)
+  const method = opts.method ?? 'GET'
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method,
+      headers: headers(token, opts.body !== undefined),
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      signal: opts.detached ? undefined : activeSignal,
+    })
+  } catch (err) {
+    if (!isAbortError(err)) {
+      const e = err as Error & { cause?: { code?: string; message?: string } }
+      lastFailure = { at: new Date(), method, url, message: [e.message, e.cause?.code, e.cause?.message].filter(Boolean).join(' - ') }
+    }
+    throw err
+  }
+  if (!res.ok) throw new Error(await errorText(res, method, url))
   if (res.status === 204) return undefined as T
   const text = await res.text()
   return (text ? JSON.parse(text) : undefined) as T

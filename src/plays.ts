@@ -82,7 +82,7 @@ export function recordPlay(track: Track, onWarn: (text: string) => void): void {
   }).catch((err) => {
     if (warnedPlay) return
     warnedPlay = true
-    onWarn(`couldn’t add that play to your history (${describeError(err)})`)
+    onWarn(`couldn’t add that play to your history (${describeError(err)}) - run: error`)
   })
   pending.set(track.songId, (pending.get(track.songId) ?? 0) + 1)
   timer ??= setTimeout(() => { void flushPlays() }, DEBOUNCE_MS)

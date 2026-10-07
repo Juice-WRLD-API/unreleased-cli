@@ -60,7 +60,7 @@ Commands (type `help <command>` in the shell for the details of each one):
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
 - **Settings:** `set`, `settings`, `bind`, `termtheme`
 - **App:** `http`
-- **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `reload`, `exit`, `help`
+- **Shell:** `source`, `alias`, `unalias`, `history`, `error`, `echo`, `watch`, `full`, `date`, `clear`, `reload`, `exit`, `help`
 - **Account:** `login`, `logout`, `whoami`, `token`, `api`, `version`, `profile`, `nowplaying`, `donor`, `nodes`, `sync`, `register`, `approvals`, `otp`
 
 Most of the Content, Editor, Admin and Account commands are the site terminal's own code, run unchanged (see `site-modules.mjs`). The chat commands (`dm`, `say`, `keys`, `server`, `room`…) are not in the CLI, which has no chat.
