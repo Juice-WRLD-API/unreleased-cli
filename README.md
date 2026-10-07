@@ -26,7 +26,7 @@ sudo add-apt-repository ppa:saint-duckworth/ppa
 sudo apt install unreleased-cli
 ```
 
-To update later, run `unreleased update` (or `update` inside the shell). It checks for a newer version and installs it if you installed from npm; `update -c` only checks.
+To update later, run `unreleased update` (or `update` inside the shell). It checks for a newer version and installs it if you installed from npm; `update -c` only checks. The shell also tells you at startup when a newer version is out (it asks npm at most once a day, in the background; set `UNRELEASED_NO_UPDATE_CHECK=1` to turn that off).
 
 From source:
 

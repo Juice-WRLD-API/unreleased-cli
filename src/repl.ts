@@ -7,6 +7,7 @@ import { Player } from './player'
 import { flushPlays, recordPlay } from './plays'
 import { screenActive } from './screen'
 import { Shell, type Prompter } from './shell'
+import { announceUpdate } from './update'
 import { VERSION } from './api'
 
 // readline exposes these, but its typings mark them read-only or leave them out.
@@ -110,6 +111,7 @@ export async function startRepl(): Promise<boolean> {
   })
 
   showPrompt()
+  announceUpdate((text) => notify(text, 'plain'))
   await new Promise<void>((resolve) => rl.on('close', resolve))
   shell.abort()
   if (shell.player?.current) process.stdout.write(color.dim('music stopped\n'))

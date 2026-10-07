@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process'
-import { realpathSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { VERSION } from './api'
 import { fail, type Command } from './command'
+import { HOME_DIR } from './config'
 import type { Shell } from './shell'
 
 // `update`: checks npm for a newer release and installs it. It works out how
@@ -49,6 +51,43 @@ function runNpmInstall(): Promise<number> {
     child.on('error', () => resolve(1))
     child.on('close', (code) => resolve(code ?? 1))
   })
+}
+
+// The startup notice: the newest version seen is cached in ~/.unreleased, and
+// npm is asked again at most once a day, in the background, so starting the
+// shell never waits on the network. Any failure is silent. UNRELEASED_NO_UPDATE_CHECK=1 turns it off.
+const CHECK_FILE = join(HOME_DIR, 'update-check.json')
+const CHECK_EVERY_MS = 24 * 60 * 60 * 1000
+
+interface UpdateCheck { checkedAt: number; latest: string }
+
+function readCheck(): UpdateCheck | null {
+  try {
+    const c = JSON.parse(readFileSync(CHECK_FILE, 'utf8')) as Partial<UpdateCheck>
+    return typeof c.checkedAt === 'number' && typeof c.latest === 'string' ? { checkedAt: c.checkedAt, latest: c.latest } : null
+  } catch { return null }
+}
+
+export function announceUpdate(notify: (text: string) => void): void {
+  if (process.env.UNRELEASED_NO_UPDATE_CHECK) return
+  const say = (latest: string): void => {
+    if (compare(latest, VERSION) > 0) notify(`new version available: v${latest} (you have v${VERSION}) - run update to install it`)
+  }
+  const cached = readCheck()
+  if (cached) say(cached.latest)
+  if (cached && Date.now() - cached.checkedAt < CHECK_EVERY_MS) return
+  void (async () => {
+    try {
+      const res = await fetch(`https://registry.npmjs.org/${PACKAGE}/latest`, { signal: AbortSignal.timeout(5_000) })
+      if (!res.ok) return
+      const { version } = (await res.json()) as { version?: string }
+      if (!version) return
+      mkdirSync(HOME_DIR, { recursive: true })
+      writeFileSync(CHECK_FILE, JSON.stringify({ checkedAt: Date.now(), latest: version }))
+      // Already told about this one from the cache; only speak up for news.
+      if (version !== cached?.latest) say(version)
+    } catch { /* offline or npm is down: try again next start */ }
+  })()
 }
 
 export const UPDATE_COMMANDS: Command[] = [
