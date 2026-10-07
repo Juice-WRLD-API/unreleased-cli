@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sitePlugin } from '../site-modules.mjs'
+import { sitePlugin, siteDefine } from '../site-modules.mjs'
 
 // Copies the site files the CLI compiles in into site/, from a checkout of the
 // site repo:
@@ -31,7 +31,7 @@ const result = await build({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  define: { __VERSION__: '"sync"' },
+  define: { __VERSION__: '"sync"', ...siteDefine },
   plugins: [sitePlugin(siteRoot, here)],
   metafile: true,
   logLevel: 'error',

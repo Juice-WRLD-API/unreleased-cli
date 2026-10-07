@@ -2,7 +2,7 @@ import { build } from 'esbuild'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sitePlugin } from './site-modules.mjs'
+import { sitePlugin, siteDefine } from './site-modules.mjs'
 
 // Bundles the CLI into one file with no runtime dependencies. Some of the site's
 // own modules are compiled in as they are (the file tools behind cat, grep,
@@ -28,7 +28,7 @@ await build({
   format: 'esm',
   target: 'node20',
   banner: { js: '#!/usr/bin/env node' },
-  define: { __VERSION__: JSON.stringify(pkg.version) },
+  define: { __VERSION__: JSON.stringify(pkg.version), ...siteDefine },
   plugins: [sitePlugin(siteRoot, here)],
   logLevel: 'info',
 })

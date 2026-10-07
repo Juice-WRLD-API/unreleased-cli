@@ -1,11 +1,15 @@
 import { buildListeningStats, formatListeningTime, joinPlayedSongs, prefsForPeriod, type ListeningPeriod, type RankedEntry } from 'site:listeningStats'
+import { bestLyricLine, searchLyrics } from 'site:lyricSearch'
+import { pageRows } from 'site:more'
+import { PLAYLIST_EDIT_SUBS, runPlaylistEdit } from 'site:playlistEdit'
 import { pickByName } from 'site:termTypes'
 import { apiFetch, getMe } from './api'
 import { fail, needSignIn, numbered, plural, type Command } from './command'
 import { homeCwd } from './files'
 import { playerOf } from './playback'
+import { termContext } from './siteCommands'
 import { trackFromSong, type Track } from './player'
-import { completeTitles, getSong, loadCatalog, rememberList, searchSongs, songFromArg, type Song, type SongRef } from './songs'
+import { completeTitles, getSong, loadCatalog, loadLyricCatalog, rememberList, searchSongs, songFromArg, type Song, type SongRef } from './songs'
 
 // The site terminal's Library commands (lib/terminal/library.ts, find from
 // player.ts, stats from fun.ts). Playing goes through the shell's player
@@ -47,8 +51,8 @@ async function playlistSongs(id: number): Promise<{ name: string; songs: SongLit
   return { name: detail.name, songs: [...detail.items].sort((a, b) => a.position - b.position).map((i) => i.song) }
 }
 
-const SUBS = ['play', 'shuffle', 'show', 'create', 'delete', 'add', 'remove']
-const PLAYLIST_SUBS = new Set(['show', 'ls', 'delete', 'rm', 'add', 'remove', 'play', 'shuffle', 'open'])
+const SUBS = ['play', 'shuffle', 'show', 'create', 'delete', 'add', 'remove', ...PLAYLIST_EDIT_SUBS]
+const PLAYLIST_SUBS = new Set(['show', 'ls', 'delete', 'rm', 'add', 'remove', 'play', 'shuffle', 'open', 'rename', 'describe', 'public', 'private', 'move', 'cover'])
 
 async function completePlaylist(arg: string): Promise<string[]> {
   const m = /^(\S*)(\s+)?([\s\S]*)$/.exec(arg)!
@@ -68,7 +72,7 @@ async function completePlaylist(arg: string): Promise<string[]> {
 
 const PLAYLIST: Command = {
   name: 'playlist', aliases: ['pl'], group: 'Library',
-  usage: 'playlist <play|shuffle|show> <name|N>  ·  create <name>  ·  delete [-y] <name|N>  ·  add <name|N> -- <song>  ·  remove <name|N> -- <song>',
+  usage: 'playlist <play|shuffle|show> <name|N>  ·  create <name>  ·  delete [-y] <name|N>  ·  add|remove <name|N> -- <song>  ·  rename|describe <name|N> -- <text>  ·  public|private <name|N>  ·  move <name|N> -- <from> <to>  ·  cover <name|N|id:N> [-- show|set|rm]  ·  view <id>',
   description: 'Play, look at and edit your playlists. <name> can be a few letters of the title, <N> a number from playlists, <song> a title or a number from the last list',
   complete: completePlaylist,
   run: async (args, sh) => {
@@ -131,7 +135,11 @@ const PLAYLIST: Command = {
         fail('playlist open: that opens the playlist page on the site (here: playlist show)')
         return
       default:
-        fail('usage: playlist <play|shuffle|show|create|delete|add|remove> ...')
+        if (!PLAYLIST_EDIT_SUBS.includes(sub.toLowerCase())) fail('usage: playlist <play|shuffle|show|create|delete|add|remove|rename|describe|public|private|move|cover|view> ...')
+        if (sub.toLowerCase() !== 'view') needSignIn('edit playlists')
+        // The rest of what the Playlists page does (rename, visibility, order, covers)
+        // is the site's own code; the list is re-read afterwards.
+        try { await runPlaylistEdit(sub.toLowerCase(), rest, termContext(sh), playlistFromArg) } finally { playlistCache = null }
     }
   },
 }
@@ -207,6 +215,24 @@ export const LIBRARY_COMMANDS: Command[] = [
       rememberList(results)
       if (results.length === 0) { sh.print(`no songs found for "${q}"`, 'dim'); return }
       sh.print(`${numbered(results.map((r) => `${r.name}  (${r.era?.name ?? r.category})`))}\nplay N · queue add N · song N · like N · playlist add <name> -- N`)
+    },
+  },
+  {
+    name: 'lyricfind', aliases: ['lf'], group: 'Library', usage: 'lyricfind [--exact] <words from the lyrics>',
+    description: 'Search every song’s lyrics, forgiving of punctuation, typos and word order (--exact for a plain phrase match), and number the songs (then play N, queue add N, song N, like N)',
+    run: async (args, sh) => {
+      const exact = /(^|\s)--exact(?=\s|$)/.test(args)
+      const q = args.replace(/(^|\s)--exact(?=\s|$)/g, ' ').trim()
+      if (!q) fail('usage: lyricfind [--exact] <words from the lyrics>')
+      const hits = searchLyrics(await loadLyricCatalog(() => sh.status('loading the lyrics (first time takes a moment)…')), q, !exact)
+      if (hits.length === 0) { sh.print(`no lyrics match "${q}"${exact ? ' - drop --exact to loosen it' : ' (even loosely)'}`, 'dim'); return }
+      rememberList(hits)
+      const row = (i: number): string => {
+        const s = hits[i]
+        const line = bestLyricLine(s.lyrics, q, !exact)
+        return `${String(i + 1).padStart(3)}  ${s.name}  (${s.era?.name ?? s.category})${line ? `\n       “${line.length > 100 ? `${line.slice(0, 100)}…` : line}”` : ''}`
+      }
+      sh.print(`${pageRows(hits.length, row, 15)}\nplay N · queue add N · song N · like N`)
     },
   },
   {

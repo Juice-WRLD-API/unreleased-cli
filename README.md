@@ -51,14 +51,19 @@ The shell starts in the main channel (`comp`). `cd /` lists every channel, and `
 Commands (type `help <command>` in the shell for the details of each one):
 
 - **Files:** `cd`, `ls`, `pwd`, `lcd`, `get`, `cat`, `head`, `tail`, `wc`, `grep`, `locate`, `tree`, `du`
-- **Library:** `find`, `song`, `like`, `unlike`, `liked`, `playlists`, `playlist`, `stats`
+- **Library:** `find`, `lyricfind`, `song`, `like`, `unlike`, `liked`, `playlists`, `playlist`, `stats`
 - **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `eq`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
 - **People:** `user`, `lookup`
-- **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`
+- **Editor:** `versions`, `proposal`, `comp`, `apply`, `leaderboard`, `changes`
+- **Content:** `news`, `unfurl`, `tierlist`, `devfeedback`, `report`, `broadcasts`, `daily`, `fm`
+- **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`, `era`, `album`, `channels`, `usermod`, `propagation`
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
 - **Settings:** `set`, `settings`, `bind`, `termtheme`
+- **App:** `http`
 - **Shell:** `source`, `alias`, `unalias`, `history`, `echo`, `watch`, `full`, `date`, `clear`, `reload`, `exit`, `help`
-- **Account:** `login`, `logout`, `whoami`, `version`
+- **Account:** `login`, `logout`, `whoami`, `token`, `api`, `version`, `profile`, `nowplaying`, `donor`, `nodes`, `sync`, `register`, `approvals`, `otp`
+
+Most of the Content, Editor, Admin and Account commands are the site terminal's own code, run unchanged (see `site-modules.mjs`). The chat commands (`dm`, `say`, `keys`, `server`, `room`…) are not in the CLI, which has no chat.
 
 Things that work the same as on the site:
 

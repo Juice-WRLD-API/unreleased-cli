@@ -136,3 +136,27 @@ export async function loadCatalog(fresh: boolean, onFetch: () => void): Promise<
   } catch { /* still usable this time */ }
   return new Map(rows.map((s) => [s.id, s]))
 }
+
+// ─── Lyrics (lyricfind) ──────────────────────────────────────────────────────
+// The same catalog with every song's lyrics, which is much bigger than the slim
+// copy above, so it has its own file on disk (a day, like the other).
+
+export interface LyricSong extends SongRef { category: string; era: { name: string } | null; lyrics: string | null }
+
+const LYRICS_FILE = join(HOME_DIR, 'cache', 'lyrics.json')
+
+export async function loadLyricCatalog(onFetch: () => void): Promise<LyricSong[]> {
+  if (existsSync(LYRICS_FILE) && Date.now() - statSync(LYRICS_FILE).mtimeMs < CATALOG_TTL_MS) {
+    try { return JSON.parse(readFileSync(LYRICS_FILE, 'utf8')) as LyricSong[] } catch { /* unreadable - fetch it again */ }
+  }
+  onFetch()
+  const all = await apiFetch<(Song & { lyrics?: string | null })[] | { results?: (Song & { lyrics?: string | null })[] }>('/songs/', { all: 'true' })
+  const rows: LyricSong[] = (Array.isArray(all) ? all : all.results ?? [])
+    .filter((s) => s.lyrics && !HIDDEN.has(s.category))
+    .map((s) => ({ id: s.id, name: s.name, category: s.category, era: s.era ? { name: s.era.name } : null, lyrics: s.lyrics ?? null }))
+  try {
+    mkdirSync(join(HOME_DIR, 'cache'), { recursive: true })
+    writeFileSync(LYRICS_FILE, JSON.stringify(rows))
+  } catch { /* still usable this time */ }
+  return rows
+}

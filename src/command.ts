@@ -1,8 +1,9 @@
+import { pageRows } from 'site:more'
 import { getMe } from './api'
 import { getToken, loadConfig } from './config'
 import type { Shell } from './shell'
 
-export type Group = 'Files' | 'Library' | 'Player' | 'People' | 'Admin' | 'Fun' | 'Settings' | 'Shell' | 'Account'
+export type Group = 'Files' | 'Library' | 'Player' | 'People' | 'Admin' | 'Fun' | 'Settings' | 'Shell' | 'Account' | 'Editor' | 'Content' | 'App'
 
 export interface Command {
   name: string
@@ -43,6 +44,5 @@ export const plural = (n: number, word: string, many = `${word}s`): string => `$
 /** A numbered list the way the site prints one: right-aligned numbers, then a
  *  cut-off note past `limit`. */
 export function numbered(rows: string[], limit = 80): string {
-  const shown = rows.slice(0, limit).map((r, i) => `${String(i + 1).padStart(3)}  ${r}`)
-  return [...shown, ...(rows.length > limit ? [`  … ${rows.length - limit} more`] : [])].join('\n')
+  return pageRows(rows.length, (i) => `${String(i + 1).padStart(3)}  ${rows[i]}`, limit)
 }

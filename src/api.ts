@@ -43,6 +43,7 @@ export function baseFor(path: string): string {
 // tools, which don't take a signal of their own.
 let activeSignal: AbortSignal | undefined
 export function setActiveSignal(signal: AbortSignal | undefined): void { activeSignal = signal }
+export const getActiveSignal = (): AbortSignal | undefined => activeSignal
 
 function headers(token: string | null, json: boolean): Record<string, string> {
   return {

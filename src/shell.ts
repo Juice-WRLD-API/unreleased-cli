@@ -22,6 +22,7 @@ import { KARAOKE_COMMANDS } from './karaoke'
 import { VISUALIZER_COMMANDS } from './visualizer'
 import type { Player } from './player'
 import { screenActive } from './screen'
+import { siteCommands } from './siteCommands'
 
 // The site terminal's shell (components/chat/TerminalPanel.tsx) for the
 // command line: the same file-tree commands, history with `!`, aliases, output
@@ -147,7 +148,7 @@ async function login(arg: string, sh: Shell): Promise<void> {
   if (process.env.UNRELEASED_TOKEN) sh.print('note: UNRELEASED_TOKEN is set and is used instead of the saved token', 'dim')
 }
 
-const COMMANDS: Command[] = [
+const BASE_COMMANDS: Command[] = [
   {
     name: 'cd', group: 'Files', usage: 'cd [folder | .. | / | - | ~]', path: 'dir',
     description: 'Move around the file tree. / is the channel list, - goes back to the previous folder, cd alone (or ~) goes to the main channel',
@@ -302,6 +303,20 @@ const COMMANDS: Command[] = [
     },
   },
   {
+    name: 'token', aliases: ['apikey', 'api-key'], group: 'Account', usage: 'token [show]',
+    description: 'The API token this CLI is signed in with (the Authorization: Token value). Masked unless you say show. Treat it like a password',
+    complete: async (arg) => ['show'].filter((w) => w.startsWith(arg.trim().toLowerCase())),
+    run: (arg, sh) => {
+      const mode = arg.trim().toLowerCase()
+      if (mode && mode !== 'show') fail('usage: token [show]')
+      const token = getToken() ?? fail('not signed in, so there is no token (try: login)')
+      // A script runs lines nobody typed, so it doesn't get to read secrets.
+      if (mode && sh.scripted) fail('token show: not available from a script')
+      if (mode) { sh.print(`${token}\nSend it as  Authorization: Token <value>.  Anyone who has it can act as you.`); return }
+      sh.print(`${token!.slice(0, 4)}${'•'.repeat(Math.max(4, Math.min(24, token!.length - 8)))}${token!.slice(-4)}\ntoken show prints it in full`)
+    },
+  },
+  {
     name: 'whoami', group: 'Account', usage: 'whoami', description: 'The account you are signed in as',
     run: async (_arg, sh) => {
       if (!getToken()) { sh.print('guest (not signed in - try: login)', 'dim'); return }
@@ -364,7 +379,10 @@ const COMMANDS: Command[] = [
   { name: 'version', group: 'Account', usage: 'version', description: 'The CLI version and the API it talks to', run: (_arg, sh) => sh.print(`unreleased-cli ${VERSION}\nAPI ${apiBase()}`) },
 ]
 
-const GROUPS: Group[] = ['Files', 'Library', 'Player', 'People', 'Admin', 'Fun', 'Settings', 'Shell', 'Account']
+// The site's own command modules, minus anything the CLI already has.
+const COMMANDS: Command[] = [...BASE_COMMANDS, ...siteCommands(new Set(BASE_COMMANDS.flatMap((c) => [c.name, ...(c.aliases ?? [])])))]
+
+const GROUPS: Group[] = ['Files', 'Library', 'Player', 'People', 'Editor', 'Content', 'Admin', 'Fun', 'Settings', 'App', 'Shell', 'Account']
 
 function findCommand(word: string): Command | null {
   const name = word.trim().replace(/^\//, '').toLowerCase()

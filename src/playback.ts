@@ -1,4 +1,5 @@
 import { AUDIO_EXTS, getFileExt } from 'site:fileTypes'
+import { pageRows } from 'site:more'
 import { canOpenScreen } from './screen'
 import { clock, parseBool, pickByName } from 'site:termTypes'
 import { fail, plural, type Command } from './command'
@@ -71,6 +72,21 @@ function current(p: Player): Track {
 async function eraNames(): Promise<string[]> {
   const catalog = await loadCatalog(false, () => undefined)
   return [...new Set([...catalog.values()].map((s) => s.era?.name).filter((n): n is string => !!n))].sort()
+}
+
+/** The queue position a `jump` argument means: a number, or a title (exact, then
+ *  the start of one, then part of one - the first such in the queue). */
+function queueIndexFor(arg: string, titles: string[]): number {
+  const typed = arg.trim()
+  if (/^#?\d+$/.test(typed)) {
+    const n = Number(typed.replace('#', ''))
+    return n >= 1 && n <= titles.length ? n - 1 : fail(`jump to which? 1-${titles.length}`)
+  }
+  if (!typed) fail(`jump to which? 1-${titles.length} or part of a title`)
+  const q = typed.toLowerCase()
+  const lower = titles.map((t) => t.toLowerCase())
+  const at = [lower.findIndex((t) => t === q), lower.findIndex((t) => t.startsWith(q)), lower.findIndex((t) => t.includes(q))].find((i) => i >= 0)
+  return at ?? fail(`nothing in the queue matches "${typed}"`)
 }
 
 const QUEUE_SUBS = ['list', 'clear', 'add', 'next', 'remove', 'jump']
@@ -208,7 +224,7 @@ export const PLAYER_COMMANDS: Command[] = [
     },
   },
   {
-    name: 'queue', aliases: ['q'], group: 'Player', usage: 'queue [list | clear | add <song> | next <song> | remove N | jump N]',
+    name: 'queue', aliases: ['q'], group: 'Player', usage: 'queue [list | clear | add <song> | next <song> | remove N | jump N|title]',
     description: 'Show or change the play queue. <song> is a title, a number from the last list, or a file or folder here',
     complete: async (arg) => {
       const m = /^(\S*)(\s+)?([\s\S]*)$/.exec(arg)!
@@ -223,8 +239,8 @@ export const PLAYER_COMMANDS: Command[] = [
         case 'list': case 'ls': {
           if (p.queue.length === 0) { sh.print('queue is empty', 'dim'); return }
           const from = Math.max(0, p.index - 5)
-          const rows = p.queue.slice(from, from + 40).map((t, i) => `${from + i === p.index ? '▶' : ' '} ${String(from + i + 1).padStart(3)}  ${trackLine(t)}`)
-          sh.print(`${from > 0 ? `  … ${from} earlier\n` : ''}${rows.join('\n')}${from + 40 < p.queue.length ? `\n  … ${p.queue.length - from - 40} more` : ''}`)
+          const rows = pageRows(p.queue.length - from, (i) => `${from + i === p.index ? '▶' : ' '} ${String(from + i + 1).padStart(3)}  ${trackLine(p.queue[from + i])}`, 40)
+          sh.print(`${from > 0 ? `  … ${from} earlier\n` : ''}${rows}`)
           return
         }
         case 'clear': p.clear(); sh.print('queue cleared', 'ok'); return
@@ -243,12 +259,11 @@ export const PLAYER_COMMANDS: Command[] = [
           return
         }
         case 'jump': {
-          const n = Number(rest)
-          if (!Number.isInteger(n) || n < 1 || n > p.queue.length) fail(`jump to which? 1-${p.queue.length}`)
-          sh.print(`▶ ${(await p.jump(n - 1)).title}`, 'ok')
+          const n = queueIndexFor(rest, p.queue.map((t) => t.title))
+          sh.print(`▶ ${(await p.jump(n)).title}`, 'ok')
           return
         }
-        default: fail('usage: queue [list | clear | add <song> | next <song> | remove N | jump N]')
+        default: fail('usage: queue [list | clear | add <song> | next <song> | remove N | jump N|title]')
       }
     },
   },

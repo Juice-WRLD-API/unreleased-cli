@@ -1,3 +1,4 @@
+import { pageRows } from 'site:more'
 import { apiFetch } from './api'
 import { fail, needAdmin, plural, type Command } from './command'
 import type { Shell } from './shell'
@@ -181,8 +182,8 @@ export const ADMIN_COMMANDS: Command[] = [
       const status = statusArg(args, PROPOSAL_STATUSES, 'pending')
       const list = await listProposals(status)
       if (list.length === 0) { sh.print(`no ${status} song proposals`, 'dim'); return }
-      const rows = list.slice(0, LIMIT).map((p) => `#${String(p.id).padEnd(6)}${p.change_type.padEnd(8)}${oneLine(p.title, 46).padEnd(48)}${p.editor_username}  ${relativeTime(p.created_at)}`)
-      sh.print(`${rows.join('\n')}${list.length > LIMIT ? `\n… ${list.length - LIMIT} more` : ''}\n${list.length} ${status} · inspect <id> · approve <id> · reject <id> [note]`)
+      const rows = pageRows(list.length, (i) => { const p = list[i]; return `#${String(p.id).padEnd(6)}${p.change_type.padEnd(8)}${oneLine(p.title, 46).padEnd(48)}${p.editor_username}  ${relativeTime(p.created_at)}` }, LIMIT)
+      sh.print(`${rows}\n${list.length} ${status} · inspect <id> · approve <id> · reject <id> [note]`)
     }),
   },
   {
@@ -192,8 +193,8 @@ export const ADMIN_COMMANDS: Command[] = [
       const status = statusArg(args, PROPOSAL_STATUSES, 'pending')
       const list = await listComps(status)
       if (list.length === 0) { sh.print(`no ${status} comp proposals`, 'dim'); return }
-      const rows = list.slice(0, LIMIT).map((p) => `#${String(p.id).padEnd(6)}${String(p.change_type).padEnd(10)}${oneLine(p.file_path, 46).padEnd(48)}${p.contributor_username}  ${relativeTime(p.created_at)}`)
-      sh.print(`${rows.join('\n')}${list.length > LIMIT ? `\n… ${list.length - LIMIT} more` : ''}\n${list.length} ${status} · inspect comp <id> · approve comp <id> · reject comp <id> [note]`)
+      const rows = pageRows(list.length, (i) => { const p = list[i]; return `#${String(p.id).padEnd(6)}${String(p.change_type).padEnd(10)}${oneLine(p.file_path, 46).padEnd(48)}${p.contributor_username}  ${relativeTime(p.created_at)}` }, LIMIT)
+      sh.print(`${rows}\n${list.length} ${status} · inspect comp <id> · approve comp <id> · reject comp <id> [note]`)
     }),
   },
   {
@@ -281,7 +282,7 @@ export const ADMIN_COMMANDS: Command[] = [
         u.contributor_enabled ? 'contrib' : '', u.manager_enabled ? 'mgr' : '', u.news_enabled ? 'news' : '',
         u.auto_approve_proposals ? 'auto-edits' : '', u.auto_approve_comp_proposals ? 'auto-comp' : '', u.is_active ? '' : 'DISABLED',
       ].filter(Boolean).join(',')
-      sh.print(`${list.slice(0, LIMIT).map((u) => `${String(u.user_id).padEnd(7)}${u.username.padEnd(22)}${u.role.padEnd(15)}${relativeTime(u.last_login).padEnd(12)}${flags(u)}`).join('\n')}\n${list.length > LIMIT ? `… ${list.length - LIMIT} more · ` : ''}${plural(list.length, 'user')}`)
+      sh.print(`${pageRows(list.length, (i) => { const u = list[i]; return `${String(u.user_id).padEnd(7)}${u.username.padEnd(22)}${u.role.padEnd(15)}${relativeTime(u.last_login).padEnd(12)}${flags(u)}` }, LIMIT)}\n${plural(list.length, 'user')}`)
     }),
   },
   {

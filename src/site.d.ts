@@ -134,4 +134,24 @@ declare module 'site:termThemes' {
   export const TERM_THEMES: TermTheme[]
 }
 
+declare module 'site:lyricSearch' {
+  export function searchLyrics<S extends { lyrics?: string | null }>(songs: S[], query: string, fuzzy?: boolean): S[]
+  export function bestLyricLine(lyrics: string | null | undefined, query: string, fuzzy?: boolean): string
+}
+
+declare module 'site:playlistEdit' {
+  import type { PlaylistSummary } from './library'
+  export const PLAYLIST_EDIT_SUBS: readonly string[]
+  export function runPlaylistEdit(sub: string, rest: string, ctx: object, playlistFromArg: (arg: string) => Promise<PlaylistSummary>): Promise<void>
+}
+
+declare module 'site:more' {
+  export function pageRows(count: number, row: (i: number) => string, size: number): string
+  export function pageLines(lines: string[], size: number): string
+}
+
+declare module 'site:commands' {
+  export const SITE_COMMANDS: readonly object[]
+}
+
 declare const __VERSION__: string
