@@ -1,12 +1,7 @@
 {
-  "commit": "05e7bd749f030231f899517900e9764b7c1b53a6",
+  "commit": "faadd4e574a17853c84e7d707743ed8cedb9ccda",
   "branch": "web-dev",
-  "uncommittedFiles": [
-    "src/renderer/src/lib/lyricSearch.ts",
-    "src/renderer/src/lib/terminal/editing.ts",
-    "src/renderer/src/lib/terminal/playlistEdit.ts",
-    "src/renderer/src/lib/terminal/more.ts"
-  ],
+  "uncommittedFiles": [],
   "files": [
     "src/renderer/src/lib/activeChannelState.ts",
     "src/renderer/src/lib/albumsApi.ts",
