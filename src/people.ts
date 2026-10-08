@@ -138,7 +138,12 @@ async function user(args: string, sh: Shell): Promise<void> {
   }
   const exact = String(hits[0].id) === q || norm(hits[0].username) === norm(q)
   if (hits.length === 1 || exact) { sh.print(await describeUser(hits[0].id, true)); return }
-  sh.print(`${hits.slice(0, 25).map((u) => `${String(u.id).padEnd(7)}${u.username.padEnd(22)}${u.discord.padEnd(22)}${u.role}`).join('\n')}\n${hits.length} matches${hits.length > 25 ? ' (showing 25)' : ''} · user <exact name or id> for details`)
+  const shown = hits.slice(0, 25)
+  // The admin list has no display names, so fetch them from each profile.
+  await Promise.all(shown.map(async (u) => {
+    try { u.display = (await apiFetch<PublicProfile>(`/accounts/profile/${u.id}/`)).display_name ?? '' } catch (e) { if (isAbortError(e)) throw e }
+  }))
+  sh.print(`${shown.map((u) => `${String(u.id).padEnd(7)}${u.username.padEnd(22)}${(u.display || u.discord).padEnd(22)}${u.role}`).join('\n')}\n${hits.length} matches${hits.length > 25 ? ' (showing 25)' : ''} · user <exact name or id> for details`)
 }
 
 async function lookup(args: string, sh: Shell): Promise<void> {
