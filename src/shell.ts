@@ -16,6 +16,7 @@ import { PLAYER_COMMANDS } from './playback'
 import { SETTINGS_COMMANDS } from './settings'
 import { UPDATE_COMMANDS } from './update'
 import { CDN_COMMANDS } from './cdn'
+import { NO_PROMPT, PASSKEY_COMMANDS } from './passkeys'
 import { EQ_COMMANDS } from './eq'
 import { HOTKEY_COMMANDS } from './hotkeys'
 import { KARAOKE_COMMANDS } from './karaoke'
@@ -120,6 +121,7 @@ const fileTool = (job: (cwd: FilesCwd, arg: string) => Promise<string>) => async
 
 async function login(arg: string, sh: Shell): Promise<void> {
   const username = unquote(arg)
+  if (username.toLowerCase() === 'passkey') fail(`login passkey: ${NO_PROMPT}, then type \`token copy\` in its terminal and run login here`)
   let token: string
   if (!username) {
     token = (await sh.ask('API token (on the site, type `token copy` in the terminal): ', true)).trim()
@@ -211,6 +213,7 @@ const BASE_COMMANDS: Command[] = [
   ...PEOPLE_COMMANDS,
   ...ADMIN_COMMANDS,
   ...CDN_COMMANDS,
+  ...PASSKEY_COMMANDS,
   ...FUN_COMMANDS,
   ...VISUALIZER_COMMANDS,
   ...KARAOKE_COMMANDS,
@@ -307,7 +310,7 @@ const BASE_COMMANDS: Command[] = [
   },
   {
     name: 'login', group: 'Account', usage: 'login [username]',
-    description: 'Sign in. With no username it asks for your API token (on the site: token copy in the terminal); with one it asks for the password',
+    description: 'Sign in. With no username it asks for your API token (on the site: token copy in the terminal); with one it asks for the password. Passkeys only work on the site',
     run: login,
   },
   {

@@ -186,6 +186,7 @@ You can browse the files without an account. To sign in:
 
 - `login` asks for your API token. On the site, open the terminal and type `token copy` to get it.
 - `login <username>` signs in with a username and password, and asks for a 2FA code if the account has one.
+- Passkeys need the browser's prompt, so they only work on the site. Sign in there, then use `token copy` and `login`. `passkeys` lists your passkeys here, and `passkeys rename` / `passkeys rm` change them; add new ones on the site.
 
 `logout` only forgets the token on this computer. The token itself keeps working on the site.
 
