@@ -51,17 +51,17 @@ The shell starts in the main channel (`comp`). `cd /` lists every channel, and `
 Commands (type `help <command>` in the shell for the details of each one):
 
 - **Files:** `cd`, `ls`, `pwd`, `lcd`, `get`, `cat`, `head`, `tail`, `wc`, `grep`, `locate`, `tree`, `du`
-- **Library:** `find`, `lyricfind`, `song`, `like`, `unlike`, `liked`, `playlists`, `playlist`, `stats`
+- **Library:** `find`, `lyricfind`, `song`, `like`, `unlike`, `liked`, `playlists`, `playlist`, `stats`, `onthisday`, `versionprefs`
 - **Player:** `play`, `pause`, `toggle`, `next`, `prev`, `seek`, `volume`, `speed`, `eq`, `shuffle`, `repeat`, `queue`, `status`, `sleep`, `stop`
 - **People:** `user`, `lookup`
-- **Editor:** `versions`, `proposal`, `comp`, `apply`, `leaderboard`, `changes`
+- **Editor:** `versions`, `proposal`, `comp`, `comp-replace`, `apply`, `leaderboard`, `changes`
 - **Content:** `news`, `unfurl`, `tierlist`, `devfeedback`, `report`, `broadcasts`, `daily`, `fm`
-- **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`, `era`, `album`, `channels`, `usermod`, `propagation`
+- **Admin** (administrators only): `pending`, `proposals`, `comps`, `applications`, `cdn`, `inspect`, `approve`, `reject`, `reverse`, `users`, `sitebans`, `siteunban`, `era`, `album`, `channels`, `usermod`, `propagation`, `logs`, `beta`, `lyricsjobs`, `lyricsmodel`
 - **Fun:** `neofetch`, `fortune`, `juicesay`, `matrix`, `visualizer`, `karaoke`, `wordle`, `heardle`
 - **Settings:** `set`, `settings`, `bind`, `termtheme`
 - **App:** `http`
 - **Shell:** `source`, `alias`, `unalias`, `history`, `error`, `echo`, `watch`, `full`, `date`, `clear`, `reload`, `exit`, `help`
-- **Account:** `login`, `logout`, `whoami`, `token`, `api`, `version`, `profile`, `nowplaying`, `donor`, `nodes`, `sync`, `register`, `approvals`, `otp`
+- **Account:** `login`, `logout`, `whoami`, `token`, `api`, `version`, `profile`, `nowplaying`, `donor`, `nodes`, `sync`, `register`, `approvals`, `otp`, `passkeys`, `lyricsgen`
 
 Most of the Content, Editor, Admin and Account commands are the site terminal's own code, run unchanged (see `site-modules.mjs`). The chat commands (`dm`, `say`, `keys`, `server`, `room`…) are not in the CLI, which has no chat.
 
@@ -86,7 +86,10 @@ Things that work the same as on the site:
 `find <title>` searches the songs and numbers the results. `liked` and `playlist show` number theirs too. A number then stands for that row in the next command: `song 2`, `like 2`, `playlist add Chill -- 2`.
 
 - `song <title | N>` shows a song's era, credits and dates, plus the `get` command that downloads its file.
-- `playlist` can show, create, delete, add and remove. A playlist can be named by a few letters of its title or by its number in `playlists`. Deleting asks first, or takes `-y`. Playing a playlist is left to the site, since the CLI has no player.
+- `playlist` can show, play, create, delete, add and remove. A playlist can be named by a few letters of its title or by its number in `playlists`. Deleting asks first, or takes `-y`.
+- Playlists can mix songs, comp files and your donor uploads. `playlist add Mix -- file "/legacy/Songs/example.mp3"` adds a file from the tree; `playlist add Mix -- myfile demo` picks one of your uploads. `playlist remove Mix -- at 3` removes any entry by its position. `playlist show` keeps those positions when you use `play N` or `queue add N`. Local files added on another device are listed and can be removed, but can't play here. Donor files need a private playlist.
+- `onthisday` (or `otd`) shows what was recorded, previewed, surfaced or released on this date. It also takes `oct 24`, `10-24`, `yesterday` or `tomorrow`, and `onthisday play` queues the day's audio oldest first. `--json` prints the events as data.
+- `versionprefs` (or `vprefs`) reads and changes your preferred and excluded versions, using the app's toggle rules and saving them to your account.
 - `stats [all | 7 | 30] [N]` charts your listening history the way the site does. It needs the whole song catalog (about 11 MB), so a slim copy is kept in `~/.unreleased/cache` for a day. `-r` reloads it.
 - `user <id>` works for anyone. `user <name>` needs an administrator account, because it searches the admin account list. The site finds people through chat, which the CLI doesn't have.
 - `lookup <text>` searches songs, your playlists, channels, commands and (for administrators) people at once.
@@ -100,7 +103,7 @@ Music plays through a hidden mpv that the interactive shell starts the first tim
 - `play <title | N>` plays a song by title, or by its number from the last list.
 - `play <file | folder>` plays something from the file tree. A folder queues the audio files directly inside it, and `play .` plays the folder you're in.
 - `playlist play <name>`, `playlist shuffle <name>`, `liked play` and `shuffle <era> [count]` replace the queue.
-- `queue add` and `queue next` add to it. `queue` lists it, and `remove N` / `jump N` change it.
+- `queue add` and `queue next` add to it. `queue` lists it, and `remove N` / `jump N` change it. `queue history` keeps the tracks you left, including across queue replacements, for this shell session.
 - Shuffle, repeat, previous and the end of the queue behave as they do on the site.
 - `status` (or `now`) shows the song, a progress bar, the settings and the queue, and follows along live on a terminal (`q` leaves). `status -1` prints it once, and it does too when piped or run in a script.
 - `like` and `unlike` with no song act on the one playing.
@@ -127,6 +130,16 @@ These cover the Admin page's review queues and site moderation, using the same e
 - `cdn` shows the CDN stats and every node, pending ones first. `cdn <node>` shows one in full, where a node is its id, the start of the id, or its name. `cdn approve|revoke|enable|disable|reset|restore|delete <node>` does what the Admin page's CDN nodes tab does. `restore` is for a node the server pulled for hash violations: it switches it back on and resets its trust and violations. `delete` asks first unless you pass `-y`.
 
 `reverse` and `siteunban` ask before they act. Outside the interactive shell, such as in one-shot use or a script, they need `-y` instead.
+
+## Lyrics generation and comp replacement
+
+`lyricsgen` runs the app's donor lyrics workflow: `plain` transcribes audio, `sync` aligns lyrics to it and `words` adds word timing. Use `--now`, `--song <id>` or `--path <comp path> [--channel c]` to name server audio; otherwise the CLI asks for a local audio file. `--file` asks for a .txt or .lrc file, and `--no-adlibs` leaves out adlibs. `lyricsgen ls`, `show`, `wait`, `get` and `rm` manage the previews. `lyricsgen timing 1 12.3 +0.2` adjusts a word; timing drafts stay in the CLI's storage and `get` exports them (`--original` exports the server version). Administrators also have `lyricsjobs` and `lyricsmodel`.
+
+`comp-replace --dry-run [--channel c]` asks for a local comp folder and compares it with the server. Without `--dry-run`, it shows the plan and asks before replacing the comp; `-y` skips that question. Folder paths keep their structure, and large uploads use the app's chunk protocol. Ctrl+C cancels uploads; a comp swap already sent to the server finishes there.
+
+`logs` searches server logs with the app's filters, including `--channel`. `logs stats`, `logs files` and `logs file <name>` show the other log views; `logs tail` follows live entries until Ctrl+C. The server requires an administrator with 2FA. `beta` manages beta access codes and builds.
+
+File uploads ask for a path on your computer. Avatar images must already be 200 KB or smaller; the CLI has no image resizing canvas.
 
 ## Fun
 
@@ -229,4 +242,6 @@ Some of the CLI is the site's own code, compiled in by `build.mjs`. That code li
 - The `termtheme` colour schemes come from `lib/terminal/themeStore.ts` (its `react` import is swapped for a stub).
 - The Wordle and Heardle logic comes from `lib/wordle.ts`, `lib/heardle.ts` and `lib/versionsApi.ts`. That covers the daily pick, grading, title search and version matching. Their request helpers are swapped for shims in `src/shims/`, and `localStorage` for `src/shims/localStorage.ts`.
 
-A change to those on the site reaches the CLI when you run `npm run sync` (it copies the files from the site checkout next to this repo, `../music-player-web`; pass another path with `npm run sync -- <path>` or `UNRELEASED_SITE`) and then `npm run build`. The sync works out the file list itself by bundling against the checkout, so a new import in one of those modules is picked up without editing anything. The declarations in `src/site.d.ts` have to stay in step with their signatures. The other commands are ports, because their site versions read the app's stores.
+A change to those in the app reaches the CLI when you run `npm run sync` (it copies the files from `../unreleased-app`; pass another checkout with `npm run sync -- <path>` or `UNRELEASED_SITE`) and then `npm run build`. The sync works out the file list itself by bundling against the checkout, so a new import in one of those modules is picked up without editing anything. The declarations in `src/site.d.ts` have to stay in step with their signatures. The other commands are ports, because their app versions read the app's stores. Browser uploads, timers and WebSockets have Node adapters; the shared token lookup reads the CLI's config. WebSocket support is bundled, so the published CLI still has no runtime package dependencies.
+
+`npm run typecheck`, `npm run build` and `npm test` check the CLI. Tests use an isolated config, a mock API and a local WebSocket server, without reaching your account.

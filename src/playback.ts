@@ -6,7 +6,7 @@ import { fail, plural, type Command } from './command'
 import { listDir, lookupEntry, unquote } from './files'
 import { trackFromFile, trackFromSong, type Player, type Repeat, type Track } from './player'
 import type { Shell } from './shell'
-import { completeTitles, getSong, hasList, loadCatalog, songFromArg } from './songs'
+import { completeTitles, getSong, hasList, listedRow, loadCatalog, songFromArg } from './songs'
 
 // The site terminal's Player commands (lib/terminal/player.ts) on top of mpv.
 // Playback lives in the interactive shell and stops with it, so a one-shot
@@ -21,6 +21,9 @@ export function playerOf(sh: Shell): Player {
 export async function tracksFromArg(arg: string, sh: Shell): Promise<{ tracks: Track[]; label: string }> {
   const typed = unquote(arg)
   if (!typed) fail('name a song (a title, a number from the last list, or a file or folder here)')
+  const row = listedRow(typed)
+  if (row?.track) return { tracks: [row.track], label: row.name }
+  if (row && !row.song) fail(`${row.name}: unavailable on this device`)
   if (!(/^#?\d+$/.test(typed) && hasList())) {
     // `.` is the folder you're in (`play .` plays what `ls` shows).
     const here = sh.cwd.channel && sh.cwd.dir.length > 0 && (typed === '.' || typed === './')
@@ -89,7 +92,7 @@ function queueIndexFor(arg: string, titles: string[]): number {
   return at ?? fail(`nothing in the queue matches "${typed}"`)
 }
 
-const QUEUE_SUBS = ['list', 'clear', 'add', 'next', 'remove', 'jump']
+const QUEUE_SUBS = ['list', 'history', 'clear', 'add', 'next', 'remove', 'jump']
 
 export const PLAYER_COMMANDS: Command[] = [
   {
@@ -224,7 +227,7 @@ export const PLAYER_COMMANDS: Command[] = [
     },
   },
   {
-    name: 'queue', aliases: ['q'], group: 'Player', usage: 'queue [list | clear | add <song> | next <song> | remove N | jump N|title]',
+    name: 'queue', aliases: ['q'], group: 'Player', usage: 'queue [list | history | clear | add <song> | next <song> | remove N | jump N|title]',
     description: 'Show or change the play queue. <song> is a title, a number from the last list, or a file or folder here',
     complete: async (arg) => {
       const m = /^(\S*)(\s+)?([\s\S]*)$/.exec(arg)!
@@ -236,6 +239,9 @@ export const PLAYER_COMMANDS: Command[] = [
       const [sub = 'list', ...restWords] = args.trim().split(/\s+/)
       const rest = restWords.join(' ')
       switch (sub.toLowerCase() || 'list') {
+        case 'history':
+          sh.print(p.history.length ? pageRows(p.history.length, (i) => `${String(i + 1).padStart(3)}  ${trackLine(p.history[i])}`, 200) : 'no play history yet', p.history.length ? 'plain' : 'dim')
+          return
         case 'list': case 'ls': {
           if (p.queue.length === 0) { sh.print('queue is empty', 'dim'); return }
           const from = Math.max(0, p.index - 5)
@@ -263,7 +269,7 @@ export const PLAYER_COMMANDS: Command[] = [
           sh.print(`▶ ${(await p.jump(n)).title}`, 'ok')
           return
         }
-        default: fail('usage: queue [list | clear | add <song> | next <song> | remove N | jump N|title]')
+        default: fail('usage: queue [list | history | clear | add <song> | next <song> | remove N | jump N|title]')
       }
     },
   },

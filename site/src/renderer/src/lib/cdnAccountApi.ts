@@ -7,12 +7,12 @@
 // their Allow headers): GET accounts/nodes/, GET/PATCH/DELETE
 // accounts/nodes/{node_id}/. The response bodies aren't documented anywhere
 // yet, so the list is unwrapped defensively and every stat field is optional.
-import { routeUrl } from './juicewrldApi'
+import { JWAPI_BASE } from './juicewrldApi'
 import { authedRequest } from './apiClient'
 import { getToken } from './userApi'
 import type { CdnNodeStatus } from './cdnAdminApi'
 
-const NODES_BASE = routeUrl('/accounts/nodes')
+const NODES_BASE = `${JWAPI_BASE}/accounts/nodes`
 
 export interface CdnOwnedNode {
   node_id: string
@@ -26,6 +26,8 @@ export interface CdnOwnedNode {
   file_count?: number
   current_storage_bytes?: number
   max_storage_bytes?: number
+  selected_channels?: string[]
+  selected_folders?: string[]
   upload_speed_mbps?: number
   /** Median of the last 20 listener-reported transfer speeds. */
   observed_download_speed_mbps?: number | null

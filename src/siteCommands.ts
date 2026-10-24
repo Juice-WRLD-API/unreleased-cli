@@ -2,7 +2,7 @@ import { SITE_COMMANDS } from 'site:commands'
 import { getActiveSignal } from './api'
 import { fail, needAdmin, type Command, type Group } from './command'
 import type { Shell } from './shell'
-import { primeStore } from './shims/useStore'
+import { primeLyrics, primeStore } from './shims/useStore'
 
 // The site terminal's own command modules (lib/terminal/*.ts), run as they are:
 // each is a { name, usage, run(args, ctx) } list written against a TermCtx, and
@@ -46,8 +46,43 @@ class ConfirmNeeded extends Error {
 
 // The shell a command is running in, for the shims that have to ask something
 // (a file's path for an upload) or save something (a download).
-let current: Shell | null = null
-export const runningShell = (): Shell => current ?? fail('nothing is running')
+interface CommandContext { shell: Shell; inputs: unknown[]; index: number; saves: (() => Promise<void>)[] }
+let current: CommandContext | null = null
+export const runningShell = (): Shell => current?.shell ?? fail('nothing is running')
+export const activePlayerTrack = () => current?.shell.player?.current ?? null
+
+export async function commandInput<T>(read: () => Promise<T>): Promise<T> {
+  const ctx = current ?? fail('nothing is running')
+  const index = ctx.index++
+  if (index < ctx.inputs.length) return ctx.inputs[index] as T
+  const input = await read()
+  ctx.inputs[index] = input
+  return input
+}
+
+export function deferCommand(save: () => Promise<void>): void {
+  const ctx = current ?? fail('nothing is running')
+  ctx.saves.push(save)
+}
+
+export async function runSiteAction(sh: Shell, run: (confirmed: boolean) => Promise<void>): Promise<void> {
+  const previous = current
+  const ctx: CommandContext = { shell: sh, inputs: [], index: 0, saves: [] }
+  current = ctx
+  try {
+    await primeStore()
+    try { await run(false) } catch (err) {
+      if (!(err instanceof ConfirmNeeded)) throw err
+      if (sh.scripted || !process.stdin.isTTY) fail('this needs confirmation - add -y to run it without being asked')
+      if (!/^y(es)?$/i.test((await sh.ask(`${err.question} [y/N] `)).trim())) { sh.print('cancelled', 'dim'); return }
+      // Reuse exactly the files selected while making the reviewed plan.
+      ctx.index = 0
+      ctx.saves = []
+      await run(true)
+    }
+    for (const save of ctx.saves) await save()
+  } finally { current = previous }
+}
 
 /** What a site command's TermCtx is, for code that calls into one directly. */
 export function termContext(sh: Shell): TermCtx {
@@ -81,17 +116,10 @@ function wrap(c: SiteCommand): Command {
     }),
     run: async (arg, sh) => {
       if (c.group === 'Admin') await needAdmin()
-      const previous = current
-      current = sh
-      try {
-        await primeStore()
-        try { await c.run(arg, termContext(sh)) } catch (err) {
-          if (!(err instanceof ConfirmNeeded)) throw err
-          if (sh.scripted || !process.stdin.isTTY) fail(`${c.name}: this needs confirmation - add -y to run it without being asked`)
-          if (!/^y(es)?$/i.test((await sh.ask(`${err.question} [y/N] `)).trim())) { sh.print('cancelled', 'dim'); return }
-          await c.run(`${arg} -y`, termContext(sh))
-        }
-      } finally { current = previous }
+      await runSiteAction(sh, async (confirmed) => {
+        if (c.name === 'lyricsgen' && /(^|\s)--now(?=\s|$)/.test(arg)) await primeLyrics()
+        await c.run(confirmed ? `${arg} -y` : arg, termContext(sh))
+      })
     },
   }
 }

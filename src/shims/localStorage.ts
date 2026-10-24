@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { HOME_DIR } from '../config'
+import { HOME_DIR, getToken, loadConfig, saveConfig } from '../config'
 
 // The site's game modules (wordle.ts, heardle.ts) keep settings, saved rounds,
 // streaks and their song pools in localStorage. Here that's one JSON file,
@@ -26,9 +26,15 @@ class FileStorage {
 
   get length(): number { return Object.keys(this.load()).length }
   key(i: number): string | null { return Object.keys(this.load())[i] ?? null }
-  getItem(key: string): string | null { return this.load()[key] ?? null }
-  setItem(key: string, value: string): void { this.load()[key] = String(value); this.save() }
-  removeItem(key: string): void { delete this.load()[key]; this.save() }
+  getItem(key: string): string | null { return key === 'unreleased:authToken' ? getToken() : this.load()[key] ?? null }
+  setItem(key: string, value: string): void {
+    if (key === 'unreleased:authToken') { saveConfig({ ...loadConfig(), token: String(value) }); return }
+    this.load()[key] = String(value); this.save()
+  }
+  removeItem(key: string): void {
+    if (key === 'unreleased:authToken') { const { token: _token, ...config } = loadConfig(); saveConfig(config); return }
+    delete this.load()[key]; this.save()
+  }
   clear(): void { this.data = {}; this.save() }
 }
 

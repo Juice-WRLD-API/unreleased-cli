@@ -1,8 +1,8 @@
-import { routeUrl } from './juicewrldApi'
-import { authedRequest } from './apiClient'
+import { JWAPI_BASE } from './juicewrldApi'
+import { apiRequest } from './apiClient'
 import { getToken } from './userApi'
 
-const ACCOUNT_BASE = routeUrl('/accounts')
+const ACCOUNT_BASE = `${JWAPI_BASE}/accounts`
 
 export interface Era {
   id: number
@@ -13,7 +13,10 @@ export interface Era {
 }
 
 function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  return authedRequest<T>(url, options, getToken())
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = getToken()
+  if (token) headers['Authorization'] = `Token ${token}`
+  return apiRequest<T>(url, { ...options, headers: { ...headers, ...(options.headers as Record<string, string>) } })
 }
 
 // The docs promise a bare array here, but the same admin base has already

@@ -1,5 +1,8 @@
 import { accountName, accountRole, apiFetch, passwordLogin } from '../api'
 import { getToken, loadConfig, saveConfig } from '../config'
+import { activePlayerTrack, deferCommand } from '../siteCommands'
+import { getSong } from '../songs'
+import { flushPlays } from '../plays'
 
 // Stands in for the site's zustand store inside the site modules the CLI
 // compiles in. Only what they read is here: the signed-in account (fetched
@@ -8,6 +11,12 @@ import { getToken, loadConfig, saveConfig } from '../config'
 // local-library cover art fileTypes.ts looks up, which the CLI never has.
 
 interface State {
+  songPrefs: Record<string, Record<string, unknown>>
+  setSongDefaultVersion: (id: number, label: string | null) => void
+  setSongExcludedVersions: (id: number, labels: string[]) => void
+  _scheduleProfilePush: () => void
+  currentTrack?: { id: string; title: string; path: string; streamUrl: string }
+  currentTrackFull?: { id: string; lyrics?: string | null; syncedLyrics?: string | null }
   account: (Record<string, unknown> & { id: number }) | null
   likedTrackIds: string[]
   libraryArt: Record<string, string>
@@ -32,12 +41,23 @@ async function saveSignIn(token: string): Promise<void> {
 const notHere = (what: string) => async (): Promise<never> => { throw new Error(`${what} isn't available on the command line (try: login)`) }
 
 let state: State = {
+  songPrefs: {},
+  setSongDefaultVersion: (id, label) => saveSongPreference(id, { default_version: label }),
+  setSongExcludedVersions: (id, labels) => saveSongPreference(id, { excluded_versions: labels }),
+  _scheduleProfilePush: () => deferCommand(flushPlays),
   account: null,
   likedTrackIds: [],
   libraryArt: {},
   playlists: [],
   refreshPlaylists: async () => { /* the CLI re-reads playlists when it needs them */ },
-  toggleLike: () => { throw new Error('liking from here goes through the like command') },
+  toggleLike: (id) => {
+    const songId = Number(id.replace(/^jw-/, ''))
+    const liked = state.likedTrackIds.includes(id)
+    deferCommand(async () => {
+      await apiFetch(liked ? `/library/favorites/${songId}/` : '/library/favorites/', {}, liked ? { method: 'DELETE' } : { method: 'POST', body: { song_id: songId } })
+      state.likedTrackIds = liked ? state.likedTrackIds.filter((x) => x !== id) : [...state.likedTrackIds, id]
+    })
+  },
   loadAccount: async () => { await primeStore(true) },
   loginWithPassword: async (username, password, otp) => { await saveSignIn((await passwordLogin(username, password, otp)).token) },
   loginWithDiscord: notHere('Discord sign-in'),
@@ -54,18 +74,52 @@ export const useStore = {
 }
 
 let primedAt = 0
+let primedToken: string | null = null
+
+function saveSongPreference(id: number, patch: Record<string, unknown>): void {
+  const song = Number(id)
+  if (!Number.isInteger(song) || song <= 0) throw new Error('not a catalogue song')
+  state.songPrefs = { ...state.songPrefs, [id]: { ...state.songPrefs[id], ...patch } }
+  deferCommand(async () => {
+    primedAt = 0
+    // Read before writing the JSON blob, preserving names, counts and every
+    // preference the CLI does not own.
+    const me = await apiFetch<{ user_preferences?: Record<string, unknown>[] }>('/accounts/account/me/')
+    if (!Array.isArray(me.user_preferences)) throw new Error('the server does not report song preferences')
+    const rows = me.user_preferences.map((row) => ({ ...row }))
+    const row = rows.find((r) => r.song === song)
+    if (row) Object.assign(row, patch)
+    else rows.push({ song, ...patch })
+    await apiFetch('/accounts/account/me/', {}, { method: 'PATCH', body: { user_preferences: rows } })
+  })
+}
+
+export async function primeLyrics(): Promise<void> {
+  const track = activePlayerTrack()
+  if (track?.songId !== undefined) {
+    const song = await getSong(track.songId)
+    state.currentTrackFull = { id: `jw-${song.id}`, lyrics: song.lyrics, syncedLyrics: song.synced_lyrics }
+  }
+}
 
 /** Loads the signed-in account (and liked songs) into the store, at most once a
  *  minute; a guest gets none. Commands read the store synchronously. */
 export async function primeStore(force = false): Promise<void> {
-  if (!getToken()) { state = { ...state, account: null, likedTrackIds: [] }; return }
-  if (!force && state.account && Date.now() - primedAt < 60_000) return
+  const track = activePlayerTrack()
+  const path = track ? new URL(track.url).searchParams.get('path') ?? '' : ''
+  state.currentTrack = track ? { id: track.songId === undefined ? `api-file-${path}` : `jw-${track.songId}`, title: track.title, path, streamUrl: track.url } : undefined
+  state.currentTrackFull = undefined
+  const token = getToken()
+  if (!token) { state = { ...state, account: null, likedTrackIds: [], songPrefs: {} }; primedToken = null; return }
+  if (!force && token === primedToken && state.account && Date.now() - primedAt < 60_000) return
   const [account, favorites] = await Promise.all([
     apiFetch<State['account']>('/accounts/account/me/'),
     apiFetch<{ song: { id: number } }[]>('/library/favorites/').catch(() => []),
   ])
-  state = { ...state, account, likedTrackIds: favorites.map((f) => `jw-${f.song.id}`) }
+  const rows = (account?.user_preferences ?? []) as { song: number; [key: string]: unknown }[]
+  state = { ...state, account, likedTrackIds: favorites.map((f) => `jw-${f.song.id}`), songPrefs: Object.fromEntries(rows.map((r) => [r.song, r])) }
   primedAt = Date.now()
+  primedToken = token
 }
 
 export function useStorePick(): never { throw new Error('not available outside the browser') }

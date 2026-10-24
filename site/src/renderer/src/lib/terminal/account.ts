@@ -4,7 +4,9 @@ import {
   compressImageFile, decideLoginApproval, getDiscordAuthUrl, getFavorites, getMe, getOtpSetup, listLoginApprovals, pollLoginApproval,
   confirmOtpSetup, removeAvatar, requestLoginApproval, updateAvatar, updateBio, updateDisplayName,
   updateNowPlaying, updatePrivacySettings, updateUserSettings, discordRedirectUri, type AccountUser,
+  API_KEY_SCOPES, createApiKey, isManagerAnywhere, deleteApiKey, listApiKeys, updateApiKey, type ApiKeyScope, type UserApiKey,
 } from '../userApi'
+import { addPasskey, deletePasskey, getPasskeySupport, listPasskeys, renamePasskey, type Passkey } from '../passkeyApi'
 import { relativeTime } from '../../components/adminShared'
 import { pickLocalFile } from './pick'
 import { songFromArg, completeSongs } from './player'
@@ -47,10 +49,17 @@ async function passwordSignIn(username: string, ctx: TermCtx): Promise<void> {
     await st().loginWithPassword(username, password)
   } catch (err) {
     if (!/otp/i.test((err as Error)?.message ?? '')) throw err
-    // Staff accounts have a second factor: a code, or a nod from another device.
-    const answer = (await ctx.ask('2FA code (or "approve" to approve it on another device): ')).trim()
+    // Staff accounts have a second factor: a code, or a nod from another
+    // device. A passkey counts as two-factor on its own, so it skips this step.
+    const passkey = (await getPasskeySupport()).ceremonies
+    const answer = (await ctx.ask(passkey
+      ? '2FA code ("approve" to approve it on another device, "passkey" to use a passkey instead): '
+      : '2FA code (or "approve" to approve it on another device): ')).trim()
     if (answer.toLowerCase() === 'approve') await loginByApproval(username, password, ctx)
-    else await st().loginWithPassword(username, password, answer)
+    else if (passkey && answer.toLowerCase() === 'passkey') {
+      ctx.print('Opening the passkey prompt…', 'dim')
+      if (!(await st().loginWithPasskey())) fail('cancelled')
+    } else await st().loginWithPassword(username, password, answer)
   }
 }
 
@@ -64,19 +73,78 @@ function describeMe(a: AccountUser): string {
   ].join('\n')
 }
 
+// `read,write` -> validated scope list in canonical order. Like the Settings
+// picker, `admin` is only for administrators and managers - unless the key
+// already has it (`had`), so changing other scopes doesn't trip on it.
+function parseScopes(raw: string | undefined, had: ApiKeyScope[] = []): ApiKeyScope[] {
+  const a = signedIn()
+  const staff = a.is_administrator || isManagerAnywhere(a)
+  const allowed = API_KEY_SCOPES.filter((sc) => sc !== 'admin' || staff || had.includes('admin'))
+  const words = (raw ?? '').toLowerCase().split(/[\s,]+/).filter(Boolean)
+  const bad = words.filter((w) => !allowed.includes(w as ApiKeyScope))
+  if (bad.length) {
+    fail(bad.length === 1 && bad[0] === 'admin'
+      ? 'the admin scope is only for administrators and managers'
+      : `unknown scope ${bad.join(', ')} (${allowed.join(', ')})`)
+  }
+  if (words.length === 0) fail(`pick at least one scope: ${allowed.join(', ')}`)
+  return API_KEY_SCOPES.filter((sc) => words.includes(sc))
+}
+
+// A key by full id, id prefix, key prefix or exact name.
+async function findApiKey(ref: string | undefined): Promise<UserApiKey> {
+  if (!ref) return fail('which key? (id, prefix or name - see apikeys)')
+  const keys = await listApiKeys()
+  const lower = ref.toLowerCase()
+  const hits = keys.filter((k) => k.id === ref || k.key_prefix === ref || k.name.toLowerCase() === lower)
+  const pool = hits.length ? hits : keys.filter((k) => k.id.startsWith(lower) || k.key_prefix.startsWith(ref))
+  if (pool.length === 1) return pool[0]
+  return fail(pool.length ? `${ref} matches ${pool.length} keys - use more of the id` : `no API key matches ${ref}`)
+}
+
+// A passkey by full id, id prefix or exact name.
+async function findPasskey(ref: string | undefined): Promise<Passkey> {
+  if (!ref) return fail('which passkey? (id, prefix or name - see passkeys)')
+  const all = await listPasskeys()
+  const lower = ref.toLowerCase()
+  const hits = all.filter((p) => p.id === ref || p.name.toLowerCase() === lower)
+  const pool = hits.length ? hits : all.filter((p) => p.id.startsWith(lower))
+  if (pool.length === 1) return pool[0]
+  return fail(pool.length ? `${ref} matches ${pool.length} passkeys - use more of the id` : `no passkey matches ${ref}`)
+}
+
+const passkeyLine = (p: Passkey): string[] => [
+  p.id.slice(0, 8), p.name, p.transports.join(',') || '-', p.backed_up ? 'synced' : 'device-bound',
+  p.created_at ? `added ${relativeTime(p.created_at)}` : '-',
+  p.last_used_at ? `used ${relativeTime(p.last_used_at)}` : 'never used',
+]
+
+const apiKeyLine = (k: UserApiKey): string[] => [
+  k.id.slice(0, 8), k.name, `${k.key_prefix}…`, k.scopes.join(','), k.is_active ? 'active' : 'revoked',
+  k.last_used_at ? `used ${relativeTime(k.last_used_at)}` : 'never used',
+]
+
 const PRIVACY_KEYS: Record<string, 'public_play_history' | 'public_playlists' | 'public_now_playing'> = {
   history: 'public_play_history', playlists: 'public_playlists', nowplaying: 'public_now_playing',
 }
 
 export const ACCOUNT_COMMANDS: TermCommand[] = [
   {
-    name: 'login', aliases: ['signin'], group: 'Account', usage: 'login [username] | login discord [pasted callback url]',
-    description: 'Sign in (asks for the password, then a 2FA code or a nod from another device if the account needs one). `login discord` opens Discord sign-in',
-    covers: ['userApi.passwordLogin', 'userApi.requestLoginApproval', 'userApi.pollLoginApproval', 'userApi.getDiscordAuthUrl', 'userApi.exchangeDiscord', 'userApi.discordRedirectUri', 'userApi.setToken'],
-    complete: (before, partial) => (before.length === 0 && 'discord'.startsWith(partial.toLowerCase()) ? ['discord'] : []),
+    name: 'login', aliases: ['signin'], group: 'Account', usage: 'login [username] | login discord [pasted callback url] | login passkey',
+    description: 'Sign in (asks for the password, then a 2FA code or a nod from another device if the account needs one). `login discord` opens Discord sign-in; `login passkey` opens the passkey prompt (website or Windows app)',
+    covers: ['userApi.passwordLogin', 'userApi.requestLoginApproval', 'userApi.pollLoginApproval', 'userApi.getDiscordAuthUrl', 'userApi.exchangeDiscord', 'userApi.discordRedirectUri', 'userApi.setToken', 'passkeyApi.signInWithPasskey', 'passkeyApi.startPasskeySignIn', 'passkeyApi.finishPasskeySignIn'],
+    complete: (before, partial) => (before.length === 0 ? ['discord', 'passkey'].filter((v) => v.startsWith(partial.toLowerCase())) : []),
     run: async (args, ctx) => {
       const { rest } = parseArgs(args)
       if (st().account) fail(`already signed in as ${who(st().account as AccountUser)} (logout first)`)
+      if (rest[0]?.toLowerCase() === 'passkey') {
+        const support = await getPasskeySupport()
+        if (!support.ceremonies) fail(support.reason ?? 'passkeys are not available here')
+        ctx.print('Opening the passkey prompt…', 'dim')
+        if (!(await st().loginWithPasskey())) { ctx.print('cancelled', 'dim'); return }
+        ctx.print(`signed in as ${who(signedIn())}`, 'ok')
+        return
+      }
       if (rest[0]?.toLowerCase() === 'discord') {
         const pasted = rest[1]
         if (!pasted) {
@@ -225,6 +293,109 @@ export const ACCOUNT_COMMANDS: TermCommand[] = [
       if ((verb !== 'approve' && verb !== 'deny') || !id) fail('usage: approvals [approve <id> | deny <id>]')
       await decideLoginApproval(id, verb as 'approve' | 'deny')
       ctx.print(`${verb === 'approve' ? 'approved' : 'denied'} ${id}`, 'ok')
+    },
+  },
+  {
+    name: 'apikeys', aliases: ['apikey'], group: 'Account',
+    usage: 'apikeys [ls] [--json] | new <name> [--scopes read,write,admin] | rename <key> <name> | scopes <key> <read,write,admin> | revoke <key> | restore <key> | rm <key> [-y]',
+    description: 'API keys for scripts and integrations. The secret is shown once, when the key is made. <key> is an id, id prefix, key prefix or name',
+    covers: ['userApi.listApiKeys', 'userApi.createApiKey', 'userApi.updateApiKey', 'userApi.deleteApiKey'],
+    complete: (before, partial) => (before.length === 0 ? ['ls', 'new', 'rename', 'scopes', 'revoke', 'restore', 'rm'].filter((v) => v.startsWith(partial.toLowerCase())) : []),
+    run: async (args, ctx) => {
+      signedIn()
+      const { rest, bool, value } = parseArgs(args, ['scopes'])
+      const sub = (rest.shift() ?? 'ls').toLowerCase()
+      if (sub === 'ls' || sub === 'list') {
+        const keys = await listApiKeys()
+        if (asJson(ctx, bool.has('json'), keys)) return
+        if (keys.length === 0) { ctx.print('no API keys yet (apikeys new <name>)', 'dim'); return }
+        ctx.print(table(keys.map(apiKeyLine)))
+        return
+      }
+      if (sub === 'new' || sub === 'create') {
+        const name = rest.join(' ').trim()
+        if (!name) fail('usage: apikeys new <name> [--scopes read,write,admin]')
+        const k = await createApiKey(name, parseScopes(value.get('scopes') ?? 'read'))
+        ctx.print([
+          `created ${k.name} (${k.scopes.join(', ')})`,
+          `key  ${k.key}`,
+          k.message || 'Store this API key now. It will not be shown again.',
+        ].join('\n'), 'ok')
+        return
+      }
+      if (sub === 'rename') {
+        const k = await findApiKey(rest.shift())
+        const name = rest.join(' ').trim()
+        if (!name) fail('usage: apikeys rename <key> <name>')
+        await updateApiKey(k.id, { name })
+        ctx.print(`renamed ${k.name} to ${name}`, 'ok')
+        return
+      }
+      if (sub === 'scopes') {
+        const k = await findApiKey(rest.shift())
+        const scopes = parseScopes(rest.join(','), k.scopes)
+        await updateApiKey(k.id, { scopes })
+        ctx.print(`${k.name} scopes: ${scopes.join(', ')}`, 'ok')
+        return
+      }
+      if (sub === 'revoke' || sub === 'restore') {
+        const k = await findApiKey(rest.join(' '))
+        await updateApiKey(k.id, { is_active: sub === 'restore' })
+        ctx.print(`${sub === 'restore' ? 'restored' : 'revoked'} ${k.name}`, 'ok')
+        return
+      }
+      if (sub === 'rm' || sub === 'delete') {
+        const k = await findApiKey(rest.join(' '))
+        if (!confirmAction(ctx, `Delete API key ${k.name} for good?`, bool.has('y'))) return
+        await deleteApiKey(k.id)
+        ctx.print(`deleted ${k.name}`, 'ok')
+        return
+      }
+      fail('usage: apikeys [ls | new | rename | scopes | revoke | restore | rm]')
+    },
+  },
+  {
+    name: 'passkeys', aliases: ['passkey'], group: 'Account',
+    usage: 'passkeys [ls] [--json] | add [name] | rename <passkey> <name> | rm <passkey> [-y]',
+    description: 'Passkeys for signing in without a password. `add` opens the passkey prompt (website or Windows app). <passkey> is an id, id prefix or name',
+    covers: ['passkeyApi.listPasskeys', 'passkeyApi.addPasskey', 'passkeyApi.startPasskeyRegistration', 'passkeyApi.finishPasskeyRegistration', 'passkeyApi.renamePasskey', 'passkeyApi.deletePasskey'],
+    complete: (before, partial) => (before.length === 0 ? ['ls', 'add', 'rename', 'rm'].filter((v) => v.startsWith(partial.toLowerCase())) : []),
+    run: async (args, ctx) => {
+      signedIn()
+      const { rest, bool } = parseArgs(args)
+      const sub = (rest.shift() ?? 'ls').toLowerCase()
+      if (sub === 'ls' || sub === 'list') {
+        const all = await listPasskeys()
+        if (asJson(ctx, bool.has('json'), all)) return
+        if (all.length === 0) { ctx.print('no passkeys yet (passkeys add <name>)', 'dim'); return }
+        ctx.print(table(all.map(passkeyLine)))
+        return
+      }
+      if (sub === 'add' || sub === 'new') {
+        const support = await getPasskeySupport()
+        if (!support.ceremonies) fail(support.reason ?? 'passkeys are not available here')
+        ctx.print('Opening the passkey prompt…', 'dim')
+        const p = await addPasskey(rest.join(' ').trim() || undefined)
+        if (!p) { ctx.print('cancelled', 'dim'); return }
+        ctx.print(`added ${p.name}`, 'ok')
+        return
+      }
+      if (sub === 'rename') {
+        const p = await findPasskey(rest.shift())
+        const name = rest.join(' ').trim()
+        if (!name) fail('usage: passkeys rename <passkey> <name>')
+        await renamePasskey(p.id, name)
+        ctx.print(`renamed ${p.name} to ${name}`, 'ok')
+        return
+      }
+      if (sub === 'rm' || sub === 'remove' || sub === 'delete') {
+        const p = await findPasskey(rest.join(' '))
+        if (!confirmAction(ctx, `Remove passkey ${p.name}? You won't be able to sign in with it any more.`, bool.has('y'))) return
+        await deletePasskey(p.id)
+        ctx.print(`removed ${p.name}`, 'ok')
+        return
+      }
+      fail('usage: passkeys [ls | add | rename | rm]')
     },
   },
   {

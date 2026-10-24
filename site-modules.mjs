@@ -26,11 +26,20 @@ export const COMMAND_MODULES = [
   ['editing', 'EDITING_COMMANDS'],
   ['games', 'GAME_COMMANDS'],
   ['more', 'MORE_COMMANDS'],
+  ['lyricsGen', 'LYRICS_GEN_COMMANDS'],
+  ['logs', 'LOG_COMMANDS'],
+  ['beta', 'BETA_COMMANDS'],
 ]
 
 // window.confirm is a synchronous yes/no in the browser; the CLI's shim turns it
 // into a question asked before the command runs again with -y.
-export const siteDefine = { 'window.confirm': '__termConfirm' }
+export const siteDefine = {
+  'import.meta.env': '{}',
+  'window.confirm': '__termConfirm',
+  ...Object.fromEntries(['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'].map((name) => [`window.${name}`, `globalThis.${name}`])),
+}
+
+export const siteInject = (here) => [resolve(here, 'src/shims/browser.ts')]
 
 // Site modules that get a Node version wherever any other site module imports
 // them, keyed by path under src/renderer/src (no extension).
@@ -38,6 +47,7 @@ const SHIMMED = {
   'lib/apiServers': 'apiServers.ts',
   'lib/appVersion': 'appVersion.ts',
   'lib/apiClient': 'apiClient.ts',
+  'lib/donorCoverArt': 'donorCoverArt.ts',
   'store/useStore': 'useStore.ts',
   'lib/terminal/pick': 'pick.ts',
   'lib/terminal/player': 'terminalPlayer.ts',
@@ -62,11 +72,14 @@ export function sitePlugin(siteRoot, here) {
     'site:lyricSearch': resolve(lib, 'lyricSearch.ts'),
     'site:playlistEdit': resolve(lib, 'terminal/playlistEdit.ts'),
     'site:more': resolve(lib, 'terminal/more.ts'),
+    'site:onThisDay': resolve(lib, 'onThisDay.ts'),
+    'site:userApi': resolve(lib, 'userApi.ts'),
   }
 
   // Imports made from inside the site's modules, keyed by importing file, that
   // resolve to the CLI's Node version instead.
   const replaced = {
+    [resolve(lib, 'terminal/account.ts')]: { '../userApi': shim('accountUserApi.ts') },
     [resolve(lib, 'terminalFileTools.ts')]: { './terminalFiles': resolve(here, 'src/files.ts') },
     [resolve(lib, 'fileTypes.ts')]: { '../store/useStore': shim('useStore.ts') },
     [resolve(lib, 'listeningStats.ts')]: { './juicewrldApi': shim('juicewrldApi.ts') },

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { apiFetch } from './api'
 import { fail } from './command'
 import { HOME_DIR } from './config'
+import type { Track } from './player'
 
 // Songs from the API: search, title → song, and the full catalog for stats.
 // The title helpers mirror the ones in the site's lib/juicewrldApi.ts (that
@@ -10,6 +11,7 @@ import { HOME_DIR } from './config'
 
 export interface Song {
   id: number
+  public_id?: number
   name: string
   track_titles?: string[]
   path: string
@@ -21,6 +23,10 @@ export interface Song {
   record_dates?: string | null
   release_date?: string | null
   preview_date?: string | null
+  date_leaked?: string | null
+  dates?: string | null
+  lyrics?: string | null
+  synced_lyrics?: string | null
   file_names?: string | null
   additional_information?: string | null
   category: string
@@ -77,15 +83,22 @@ export const getSong = (id: number): Promise<Song> => apiFetch<Song>(`/songs/${i
 
 // The last numbered song list (find, liked, playlist show), so `song 3`,
 // `like 3` or `playlist add Mix -- 3` can point at a row by number.
-let lastList: SongRef[] = []
-export function rememberList(songs: SongRef[]): void { lastList = songs.map((s) => ({ id: s.id, name: s.name })) }
+export interface ListedRow { name: string; song?: SongRef; track?: Track }
+let lastList: ListedRow[] = []
+export function rememberList(songs: SongRef[]): void { lastList = songs.map((s) => ({ name: s.name, song: { id: s.id, name: s.name } })) }
+export function rememberRows(rows: ListedRow[]): void { lastList = rows }
 export const hasList = (): boolean => lastList.length > 0
+export function listedRow(arg: string): ListedRow | null {
+  const n = /^#?(\d+)$/.exec(arg.trim())
+  if (!n || !lastList.length) return null
+  return lastList[Number(n[1]) - 1] ?? fail(`pick a number from 1 to ${lastList.length}`)
+}
 
 export async function songFromArg(arg: string): Promise<SongRef> {
   const typed = arg.trim()
   if (!typed) fail('name a song (a title, or a number from the last list)')
   const n = /^#?(\d+)$/.exec(typed)
-  if (n && lastList.length > 0) return lastList[Number(n[1]) - 1] ?? fail(`pick a number from 1 to ${lastList.length}`)
+  if (n && lastList.length > 0) return listedRow(typed)!.song ?? fail('that row is a file, not a catalogue song (play N or playlist remove <name> -- at N)')
   const song = await resolveTitleToSong(typed)
   if (song) return song
   // A bare number with no list to pick from is more likely a pick than a title.

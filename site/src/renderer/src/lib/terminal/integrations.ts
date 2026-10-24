@@ -73,7 +73,7 @@ export const INTEGRATION_COMMANDS: TermCommand[] = [
       if (!st().account) fail('sign in first (login)')
       const [sub = '', ...more] = args.trim().split(/\s+/).filter(Boolean)
       if (!sub) {
-        st()._scheduleProfilePush(['songPrefs', 'listeningPlays', 'folders', 'userSettings'])
+        st()._scheduleProfilePush(['songPrefs', 'listeningPlays', 'folders'])
         ctx.print('pushing your profile (it goes out in a moment)', 'ok')
       } else if (sub.toLowerCase() === 'play') {
         const song = await songFromArg(more.join(' '))

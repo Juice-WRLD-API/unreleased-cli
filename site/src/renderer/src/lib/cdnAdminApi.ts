@@ -4,11 +4,11 @@
 // Nodes register anonymously from the node app (jwa-cdn-node) and serve
 // nothing until an admin approves them here. Disabling (is_active false)
 // takes a node out but keeps its history; deleting wipes it.
-import { routeUrl } from './juicewrldApi'
-import { authedRequest } from './apiClient'
+import { JWAPI_BASE } from './juicewrldApi'
+import { authedRequest, apiRequest, authHeaders } from './apiClient'
 import { getToken } from './userApi'
 
-const CDN_ADMIN_BASE = routeUrl('/cdn/admin')
+const CDN_ADMIN_BASE = `${JWAPI_BASE}/cdn/admin`
 
 export type CdnNodeStatus = 'pending' | 'online' | 'offline' | 'disabled'
 
@@ -113,7 +113,9 @@ export function wasAutoDisabled(n: CdnAdminNode): boolean {
   return n.trust_score <= 0 || n.hash_violations >= VIOLATION_LIMIT
 }
 
-export type PropagationState = 'propagated' | 'propagating' | 'offline'
+export type PropagationState = 'propagated' | 'propagating' | 'offline' | 'skipped'
+
+export type PropagationSkipReason = '' | 'channel' | 'folder' | 'storage'
 
 export interface PropagationServer {
   host: string
@@ -132,6 +134,7 @@ export interface PropagationNode {
   longitude: number | null
   online: boolean
   state: PropagationState
+  skip_reason?: PropagationSkipReason
 }
 
 export interface ProposalPropagation {
@@ -141,10 +144,69 @@ export interface ProposalPropagation {
     status: string
     change_type: string
     file_path: string
+    channel_slug?: string
   }
   nodes: PropagationNode[]
 }
 
 export async function fetchProposalPropagation(proposalId: number): Promise<ProposalPropagation> {
   return request(`${CDN_ADMIN_BASE}/proposals/${proposalId}/propagation/`, { method: 'GET' })
+}
+
+// Node binary distribution under /cdn/binary/ - the jwa-cdn-node builds
+// volunteers download. Listing is public; uploading needs an admin token.
+const CDN_BINARY_BASE = `${JWAPI_BASE}/cdn/binary`
+
+export const CDN_BINARY_PLATFORMS = [
+  'windows/amd64', 'linux/amd64', 'linux/arm64', 'darwin/amd64', 'darwin/arm64',
+] as const
+
+export interface CdnNodeBinary {
+  id: number
+  platform: string
+  version: string
+  sha256: string
+  /** Server's signature over the sha256 hex digest, made on upload. Empty for
+   *  binaries uploaded before signing existed. */
+  signature?: string
+  size: number
+  download_url: string
+  created_at: string
+}
+
+export async function fetchCdnBinaries(): Promise<CdnNodeBinary[]> {
+  const data = await apiRequest<{ binaries: CdnNodeBinary[] }>(`${CDN_BINARY_BASE}/`, { method: 'GET' })
+  return data?.binaries ?? []
+}
+
+/** Multipart upload; the server hashes and signs the file. 409 when
+ *  platform+version already exists. XHR rather than fetch because fetch can't
+ *  report upload progress. No Content-Type header - the browser sets the
+ *  multipart boundary. */
+export function uploadCdnBinary(
+  platform: string,
+  version: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<CdnNodeBinary> {
+  const body = new FormData()
+  body.append('platform', platform)
+  body.append('version', version)
+  body.append('file', file)
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${CDN_BINARY_BASE}/`)
+    for (const [k, v] of Object.entries(authHeaders(getToken()))) xhr.setRequestHeader(k, v)
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total) }
+    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.onabort = () => reject(new Error('Upload cancelled'))
+    xhr.onload = () => {
+      let data: any
+      try { data = xhr.responseText ? JSON.parse(xhr.responseText) : undefined } catch { /* non-JSON body */ }
+      if (xhr.status >= 200 && xhr.status < 300) { resolve(data as CdnNodeBinary); return }
+      const msg = data?.error ?? data?.detail
+      reject(new Error(msg ? String(msg) : `Request failed (${xhr.status})`))
+    }
+    xhr.send(body)
+  })
 }

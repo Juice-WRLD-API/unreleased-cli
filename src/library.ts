@@ -5,11 +5,13 @@ import { PLAYLIST_EDIT_SUBS, runPlaylistEdit } from 'site:playlistEdit'
 import { pickByName } from 'site:termTypes'
 import { apiFetch, getMe } from './api'
 import { fail, needSignIn, numbered, plural, type Command } from './command'
-import { homeCwd } from './files'
+import { homeCwd, lookupEntry, unquote } from './files'
 import { playerOf } from './playback'
-import { termContext } from './siteCommands'
+import { runSiteAction, termContext } from './siteCommands'
 import { trackFromSong, type Track } from './player'
-import { completeTitles, getSong, loadCatalog, loadLyricCatalog, rememberList, searchSongs, songFromArg, type Song, type SongRef } from './songs'
+import { completeTitles, getSong, loadCatalog, loadLyricCatalog, rememberList, rememberRows, searchSongs, songFromArg, type Song, type SongRef } from './songs'
+import { matchingEntry, playlistRowLabel, playlistRows, type PlaylistEntry } from './playlistItems'
+import type { Shell } from './shell'
 
 // The site terminal's Library commands (lib/terminal/library.ts, find from
 // player.ts, stats from fun.ts). Playing goes through the shell's player
@@ -17,10 +19,9 @@ import { completeTitles, getSong, loadCatalog, loadLyricCatalog, rememberList, s
 
 // ─── Playlists ───────────────────────────────────────────────────────────────
 
-export interface PlaylistSummary { id: number; name: string; track_count: number; is_public: boolean }
+export interface PlaylistSummary { id: number; name: string; track_count: number; is_public: boolean; can_be_public?: boolean }
 /** A song as playlists and favorites return it: enough to list and to play. */
 type SongLite = SongRef & { path?: string; length?: string; era?: { name: string } | null }
-interface PlaylistDetail { id: number; name: string; items: { song: SongLite; position: number }[] }
 
 /** Tracks for a list of songs; any the list didn't carry a path for are fetched. */
 async function tracksOf(songs: SongLite[]): Promise<Track[]> {
@@ -46,9 +47,22 @@ async function playlistFromArg(arg: string): Promise<PlaylistSummary> {
   return pickByName(list, (p) => p.name, arg) ?? fail(`no single playlist matches "${arg.trim()}" (try: playlists)`)
 }
 
-async function playlistSongs(id: number): Promise<{ name: string; songs: SongLite[] }> {
-  const detail = await apiFetch<PlaylistDetail>(`/library/playlists/${id}/`, { omit_cover_image: 'true' })
-  return { name: detail.name, songs: [...detail.items].sort((a, b) => a.position - b.position).map((i) => i.song) }
+async function entryFromArg(arg: string, sh: Shell): Promise<{ entry: PlaylistEntry; label: string }> {
+  const m = /^(file|myfile)\s+(.+)$/i.exec(arg)
+  if (!m) {
+    const song = await songFromArg(arg)
+    return { entry: { song_id: song.id }, label: song.name }
+  }
+  const typed = unquote(m[2])
+  if (m[1].toLowerCase() === 'file') {
+    const found = await lookupEntry(sh.cwd, typed, 'playlist')
+    const file = found.entry?.entry ?? fail(`${typed}: not a file`)
+    const channel = found.parent.channel ?? fail(`${typed}: not a comp file`)
+    return { entry: { source: 'comp', path: file.path, channel }, label: file.name }
+  }
+  const { files } = await apiFetch<{ files: { file_id: string; filename: string; mime_type: string }[] }>('/accounts/donor/files/')
+  const file = pickByName(files.filter((f) => !f.mime_type.startsWith('image/')), (f) => f.filename, typed) ?? fail(`no single audio file of yours matches "${typed}" (donor ls)`)
+  return { entry: { source: 'donor', file_id: file.file_id }, label: file.filename }
 }
 
 const SUBS = ['play', 'shuffle', 'show', 'create', 'delete', 'add', 'remove', ...PLAYLIST_EDIT_SUBS]
@@ -72,7 +86,7 @@ async function completePlaylist(arg: string): Promise<string[]> {
 
 const PLAYLIST: Command = {
   name: 'playlist', aliases: ['pl'], group: 'Library',
-  usage: 'playlist <play|shuffle|show> <name|N>  ·  create <name>  ·  delete [-y] <name|N>  ·  add|remove <name|N> -- <song>  ·  rename|describe <name|N> -- <text>  ·  public|private <name|N>  ·  move <name|N> -- <from> <to>  ·  cover <name|N|id:N> [-- show|set|rm]  ·  view <id>',
+  usage: 'playlist <play|shuffle|show> <name|N>  ·  create <name>  ·  delete [-y] <name|N>  ·  add|remove <name|N> -- <song | file <path> | myfile <name>>  ·  remove <name|N> -- at N  ·  rename|describe <name|N> -- <text>  ·  public|private <name|N>  ·  move <name|N> -- <from> <to>  ·  cover <name|N|id:N> [-- show|set|rm]  ·  view <id>',
   description: 'Play, look at and edit your playlists. <name> can be a few letters of the title, <N> a number from playlists, <song> a title or a number from the last list',
   complete: completePlaylist,
   run: async (args, sh) => {
@@ -81,9 +95,9 @@ const PLAYLIST: Command = {
     switch (sub.toLowerCase()) {
       case 'show': case 'ls': {
         const pl = await playlistFromArg(rest)
-        const { name, songs } = await playlistSongs(pl.id)
-        rememberList(songs)
-        sh.print(`${name}\n${songs.length ? numbered(songs.map((s) => s.name)) : '(empty)'}`)
+        const { name, rows } = await playlistRows(pl.id)
+        rememberRows(rows)
+        sh.print(`${name}\n${rows.length ? numbered(rows.map(playlistRowLabel)) : '(empty)'}`)
         return
       }
       case 'create': case 'new': {
@@ -113,22 +127,42 @@ const PLAYLIST: Command = {
         const split = rest.split(/\s+--\s+/)
         if (split.length < 2 || !split[1].trim()) fail(`usage: playlist ${verb} <name|N> -- <song>`)
         const pl = await playlistFromArg(split[0])
-        const song = await songFromArg(split.slice(1).join(' -- '))
-        if (verb === 'add') await apiFetch(`/library/playlists/${pl.id}/items/`, {}, { method: 'POST', body: { song_id: song.id } })
-        else await apiFetch(`/library/playlists/${pl.id}/items/${song.id}/`, {}, { method: 'DELETE' })
+        const target = split.slice(1).join(' -- ').trim()
+        const at = verb === 'remove' ? /^at\s+#?(\d+)$/i.exec(target) : null
+        let label: string
+        if (at) {
+          const { rows } = await playlistRows(pl.id)
+          const row = rows[Number(at[1]) - 1] ?? fail(`pick a position from 1 to ${rows.length}`)
+          await apiFetch(`/library/playlists/${pl.id}/entries/${row.item.id}/`, {}, { method: 'DELETE' })
+          label = row.name
+        } else {
+          const ref = await entryFromArg(target, sh)
+          label = ref.label
+          if (verb === 'add') {
+            if ('source' in ref.entry && ref.entry.source === 'donor' && pl.is_public) fail('your own files can only go in private playlists (playlist private <name>)')
+            await apiFetch(`/library/playlists/${pl.id}/items/`, {}, { method: 'POST', body: ref.entry })
+          } else if ('song_id' in ref.entry) {
+            await apiFetch(`/library/playlists/${pl.id}/items/${ref.entry.song_id}/`, {}, { method: 'DELETE' })
+          } else {
+            const { rows } = await playlistRows(pl.id)
+            const item = matchingEntry(rows.map((r) => r.item), ref.entry)
+            await apiFetch(`/library/playlists/${pl.id}/entries/${item.id}/`, {}, { method: 'DELETE' })
+          }
+        }
         playlistCache = null
-        sh.print(`${verb === 'add' ? 'added' : 'removed'} ${song.name} ${verb === 'add' ? 'to' : 'from'} "${pl.name}"`, 'ok')
+        sh.print(`${verb === 'add' ? 'added' : 'removed'} ${label} ${verb === 'add' ? 'to' : 'from'} "${pl.name}"`, 'ok')
         return
       }
       case 'play': case 'shuffle': {
         const player = playerOf(sh)
         const pl = await playlistFromArg(rest)
-        const { songs } = await playlistSongs(pl.id)
-        if (songs.length === 0) fail(`${pl.name} is empty`)
-        await player.playCollection(await tracksOf(songs))
+        const { rows } = await playlistRows(pl.id)
+        const tracks = rows.flatMap((r) => r.track ? [r.track] : [])
+        if (tracks.length === 0) fail(`${pl.name} has no playable tracks on this device`)
+        await player.playCollection(tracks)
         // Like the site: the list plays from its first song, then the rest shuffled.
         if (sub.toLowerCase() === 'shuffle') player.setShuffle(true)
-        sh.print(`▶ ${pl.name} (${plural(songs.length, 'track')}${sub.toLowerCase() === 'shuffle' ? ', shuffled' : ''})`, 'ok')
+        sh.print(`▶ ${pl.name} (${plural(tracks.length, 'track')}${sub.toLowerCase() === 'shuffle' ? ', shuffled' : ''})`, 'ok')
         return
       }
       case 'open':
@@ -139,7 +173,7 @@ const PLAYLIST: Command = {
         if (sub.toLowerCase() !== 'view') needSignIn('edit playlists')
         // The rest of what the Playlists page does (rename, visibility, order, covers)
         // is the site's own code; the list is re-read afterwards.
-        try { await runPlaylistEdit(sub.toLowerCase(), rest, termContext(sh), playlistFromArg) } finally { playlistCache = null }
+        try { await runSiteAction(sh, async () => runPlaylistEdit(sub.toLowerCase(), rest, termContext(sh), playlistFromArg)) } finally { playlistCache = null }
     }
   },
 }

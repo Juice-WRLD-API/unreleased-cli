@@ -10,6 +10,7 @@ import { FILES_ROOT, filesPathString, formatListing, homeCwd, listDir, readTextF
 import { FUN_COMMANDS, juicesayText } from './fun'
 import { GAME_COMMANDS } from './games'
 import { LIBRARY_COMMANDS } from './library'
+import { ON_THIS_DAY_COMMANDS } from './onThisDay'
 import { color, writeTone, type Tone } from './out'
 import { PEOPLE_COMMANDS } from './people'
 import { PLAYER_COMMANDS } from './playback'
@@ -208,6 +209,7 @@ const BASE_COMMANDS: Command[] = [
   { name: 'tree', group: 'Files', usage: 'tree [-L depth] [folder]', path: 'dir', description: 'A folder as an indented tree, two levels by default', run: fileTool(treeView) },
   { name: 'du', group: 'Files', usage: 'du [folder]', path: 'dir', description: 'How much is in each subfolder, and in total', run: fileTool(diskUsage) },
   ...LIBRARY_COMMANDS,
+  ...ON_THIS_DAY_COMMANDS,
   ...PLAYER_COMMANDS,
   ...EQ_COMMANDS,
   ...PEOPLE_COMMANDS,

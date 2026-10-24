@@ -3,6 +3,8 @@
 // site directly: a browser can't read another origin's og: tags, and asking
 // from here would also tell that site who is looking at the message.
 
+import { shareOrigin } from './platform'
+
 export interface LinkPreview {
   url: string
   title: string
@@ -31,7 +33,7 @@ function trimUrl(raw: string): string {
 /** The first link in a message worth previewing, or null. Code is skipped, as
  *  are links back to this site (those already have their own cards) and
  *  direct media files. */
-export function firstPreviewUrl(text: string, ownOrigin: string = window.location.origin): string | null {
+export function firstPreviewUrl(text: string, ownOrigin: string = shareOrigin()): string | null {
   const prose = text.replace(/```[\s\S]*?```|`[^`\n]*`/g, ' ')
   for (const match of prose.matchAll(URL_RE)) {
     const candidate = trimUrl(match[0])
@@ -71,7 +73,7 @@ function parsePreview(raw: unknown): LinkPreview | null {
 export function loadLinkPreview(url: string): Promise<LinkPreview | null> {
   const hit = cache.get(url)
   if (hit) return hit
-  const job = fetch(`/unfurl?url=${encodeURIComponent(url)}`, { credentials: 'omit' })
+  const job = fetch(`${shareOrigin()}/unfurl?url=${encodeURIComponent(url)}`, { credentials: 'omit' })
     .then(async (res) => {
       if (res.status === 404) return null
       if (!res.ok) throw new Error(`unfurl ${res.status}`)

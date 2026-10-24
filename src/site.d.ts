@@ -23,6 +23,7 @@ declare module 'site:fileTypes' {
 }
 
 declare module 'site:termTypes' {
+  export function parseArgs(args: string, valued?: readonly string[]): { rest: string[]; bool: Set<string>; value: Map<string, string> }
   export function clock(seconds: number): string
   export function parseBool(word: string): boolean | null
   export function pickByName<T>(items: T[], name: (t: T) => string, typed: string): T | null
@@ -155,3 +156,19 @@ declare module 'site:commands' {
 }
 
 declare const __VERSION__: string
+
+declare module 'site:userApi' {}
+
+declare module 'site:onThisDay' {
+  import type { Song } from './songs'
+  export interface DayEntry { kind: string; title: string; labels: string[]; songs: Song[] }
+  export interface DayYear { year: number; entries: DayEntry[] }
+  export const DAY_EVENT_LABELS: Record<string, string>
+  export function loadDaySongs(month: number, day: number): Promise<Song[]>
+  export function eventsOnDay(songs: Song[], month: number, day: number, now?: Date): DayYear[]
+  export function dayQueue(years: DayYear[]): Song[]
+  export function dayHeadline(years: DayYear[], isToday?: boolean, now?: Date): string | null
+  export function dayNote(month: number, day: number): string | null
+  export function hasAudio(song: Song): boolean
+  export function yearsSince(year: number, isToday: boolean, now?: Date): string
+}

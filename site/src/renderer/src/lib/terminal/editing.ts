@@ -1,6 +1,8 @@
 import { relativeTime } from '../../components/adminShared'
 import { fetchCompChanges, fetchTrackerChanges } from '../changesApi'
 import { COMP_CHUNK_THRESHOLD, createCompProposalChunked } from '../compChunkedUpload'
+import { existingCompPaths } from '../compFileChanges'
+import { loadLiveComp, localCompFiles, planCompReplace, runCompReplace } from '../compReplace'
 import { loadSessionEditFiles, loadSessionEditLinks } from '../sessionEditsApi'
 import { useStore } from '../../store/useStore'
 import {
@@ -8,7 +10,7 @@ import {
   getLeaderboard, getMyApplication, getMyCompProposals, getMyProposals, resubmitProposal, submitApplication, updateCompProposal,
   updateProposal, withdrawCompProposal, withdrawProposal, type ApplicationType, type CompProposalChangeType, type ProposalChangeType,
 } from '../userApi'
-import { pickLocalFile, saveBlob } from './pick'
+import { pickLocalFile, pickLocalFolder, saveBlob } from './pick'
 import { pageLines } from './more'
 import { completeSongs, songFromArg } from './player'
 import { asJson, confirmAction, fail, idArg, oneLine, parseArgs, parseJsonArg, table, type TermCommand, type TermCtx } from './types'
@@ -104,7 +106,7 @@ function progressPrinter(ctx: TermCtx, label: string): (sent: number, total: num
 
 const compCommand: TermCommand = {
   name: 'comp', group: 'Editor',
-  usage: 'comp [ls] · new <type> <path> [--to dest] [--note n] · edit <id> [--path p] [--to dest] [--note n] [--file] · withdraw <id> · staging <id> · history <path>   (--channel c)',
+  usage: 'comp [ls] · new <type> <path> [--to dest] [--note n] [--new-leak] · edit <id> [--path p] [--to dest] [--note n] [--file] [--new-leak|--not-new-leak] · withdraw <id> · staging <id> · history <path>   (--channel c)',
   description: `Your comp file proposals (changes to the Files tab): types ${COMP_TYPES.join(', ')}. upload/replace open a file picker. staging and history are for reviewers`,
   covers: [
     'userApi.getMyCompProposals', 'userApi.createCompProposal', 'userApi.createCompProposalUpload', 'userApi.updateCompProposal', 'userApi.withdrawCompProposal',
@@ -126,14 +128,20 @@ const compCommand: TermCommand = {
       const list = await getMyCompProposals(channel)
       if (asJson(ctx, bool.has('json'), list)) return
       if (list.length === 0) { ctx.print('no comp proposals yet', 'dim'); return }
-      ctx.print(`${table(list.map((p) => [`#${p.id}`, p.status, compChangeTypeLabel(p.change_type), p.file_path, relativeTime(p.created_at)]))}\n${list.length} proposal${list.length === 1 ? '' : 's'}`)
+      ctx.print(`${table(list.map((p) => [`#${p.id}`, p.status, compChangeTypeLabel(p.change_type) + (p.is_new_leak ? ' (new leak)' : ''), p.file_path, relativeTime(p.created_at)]))}\n${list.length} proposal${list.length === 1 ? '' : 's'}`)
     } else if (sub === 'new') {
       const type = (rest.shift() ?? '').toLowerCase() as CompProposalChangeType
       const path = rest.join(' ')
-      if (!COMP_TYPES.includes(type) || !path) fail(`usage: comp new <${COMP_TYPES.join('|')}> <path> [--to dest] [--note n]`)
+      if (!COMP_TYPES.includes(type) || !path) fail(`usage: comp new <${COMP_TYPES.join('|')}> <path> [--to dest] [--note n] [--new-leak]`)
       const dest = value.get('to')
       if (NEEDS_DESTINATION.has(type) && !dest) fail(`${type} needs a destination: --to <path>`)
-      const metadata = { change_type: type, file_path: path, destination_path: NEEDS_DESTINATION.has(type) ? dest : undefined, contributor_notes: value.get('note') ?? '', channel }
+      const metadata = { change_type: type, file_path: path, destination_path: NEEDS_DESTINATION.has(type) ? dest : undefined, contributor_notes: value.get('note') ?? '', is_new_leak: NEEDS_FILE.has(type) && bool.has('new-leak'), channel }
+      if (type === 'upload') {
+        // The server refuses an upload onto a taken path only after the body has gone up.
+        const slash = path.lastIndexOf('/')
+        const taken = await existingCompPaths(slash < 0 ? '' : path.slice(0, slash), [path.slice(slash + 1)], channel)
+        if (taken.has(path)) fail(`${path} is already in the comp - use comp new replace to change it`)
+      }
       if (NEEDS_FILE.has(type)) {
         const file = await pickLocalFile('*/*')
         ctx.print(`uploading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`, 'dim')
@@ -143,6 +151,7 @@ const compCommand: TermCommand = {
         if (metadata.destination_path) form.append('destination_path', metadata.destination_path)
         form.append('change_type', type)
         form.append('contributor_notes', metadata.contributor_notes)
+        form.append('is_new_leak', String(metadata.is_new_leak))
         form.append('file', file)
         if (channel) form.append('channel', channel)
         // Big files go up in chunks, small ones in one request - the same split the Files tab makes.
@@ -161,14 +170,16 @@ const compCommand: TermCommand = {
       const made = await createCompProposal(form)
       ctx.print(`comp proposal #${made.id} sent (${made.status}): ${compChangeTypeLabel(made.change_type)} ${made.file_path}`, 'ok')
     } else if (sub === 'edit') {
-      const id = idArg(rest[0], 'comp edit <id> [--path p] [--to dest] [--note n] [--file]')
+      const id = idArg(rest[0], 'comp edit <id> [--path p] [--to dest] [--note n] [--file] [--new-leak|--not-new-leak]')
       const form = new FormData()
       if (value.has('path')) form.append('file_path', value.get('path') as string)
       if (value.has('to')) form.append('destination_path', value.get('to') as string)
       if (value.has('note')) form.append('contributor_notes', value.get('note') as string)
+      if (bool.has('new-leak') && bool.has('not-new-leak')) fail('pick one of --new-leak or --not-new-leak')
+      if (bool.has('new-leak') || bool.has('not-new-leak')) form.append('is_new_leak', String(bool.has('new-leak')))
       if (bool.has('file')) form.append('file', await pickLocalFile('*/*'))
       if (channel) form.append('channel', channel)
-      if ([...form.keys()].every((k) => k === 'channel')) fail('nothing to change - give --path, --to, --note or --file')
+      if ([...form.keys()].every((k) => k === 'channel')) fail('nothing to change - give --path, --to, --note, --file, --new-leak or --not-new-leak')
       const p = await updateCompProposal(id, form)
       ctx.print(`comp proposal #${p.id} updated (${p.status}, edited ${p.edit_count}×)`, 'ok')
     } else if (sub === 'withdraw') {
@@ -193,9 +204,51 @@ const compCommand: TermCommand = {
   },
 }
 
+const compReplaceCommand: TermCommand = {
+  name: 'comp-replace', group: 'Editor',
+  usage: 'comp-replace [--dry-run] [--all] [--note n] [-y]   (--channel c)',
+  description: 'Swap a whole comp for a folder on this computer in one step (channel managers). Opens a folder picker; files with the same path and size are kept, everything else is uploaded, and anything not in the folder is removed. --dry-run only shows the plan, --all uploads every file again',
+  covers: ['userApi.adminReplaceComp', 'compChunkedUpload.stageCompFiles', 'compReplace.loadLiveComp', 'compReplace.runCompReplace'],
+  run: async (args, ctx) => {
+    signedIn()
+    const { bool, value } = parseArgs(args, ['note', 'channel'])
+    const channel = value.get('channel')
+    const picked = localCompFiles(await pickLocalFolder())
+    ctx.print('comparing with the current comp…', 'dim')
+    const plan = planCompReplace(picked.files, await loadLiveComp(channel), { reuploadAll: bool.has('all'), skipped: picked.skipped })
+    if (asJson(ctx, bool.has('json'), { ...plan, upload: plan.upload.map((f) => f.path) })) return
+    const mb = plan.upload.reduce((n, f) => n + f.file.size, 0) / 1048576
+    ctx.print(table([
+      ['files', String(plan.reuse.length + plan.upload.length)],
+      ['unchanged', String(plan.unchanged)],
+      ['moved', String(plan.moved.length)],
+      ['new', String(plan.added.length)],
+      ['changed', String(plan.changed.length)],
+      ['removed', String(plan.removed.length)],
+      ['skipped', String(plan.skipped.length)],
+      ['to upload', `${plan.upload.length} (${mb.toFixed(1)} MB)`],
+    ]))
+    for (const p of plan.removed.slice(0, 20)) ctx.print(`- ${p}`, 'dim')
+    if (plan.removed.length > 20) ctx.print(`  …and ${plan.removed.length - 20} more removed`, 'dim')
+    for (const s of plan.skipped.slice(0, 10)) ctx.print(`skipped ${s.path}: ${s.reason}`, 'dim')
+    if (bool.has('dry-run')) return
+    if (!confirmAction(ctx, `Replace the whole comp? ${plan.upload.length} files to upload, ${plan.removed.length} removed.`, bool.has('y'))) return
+    const run = runCompReplace(plan, {
+      channel,
+      notes: value.get('note'),
+      onPhase: (phase) => ctx.print(phase === 'uploading' ? `uploading ${plan.upload.length} files…` : 'swapping in the new comp (the server finishes this even if you leave)…', 'dim'),
+      onProgress: progressPrinter(ctx, 'upload'),
+    })
+    ctx.signal.addEventListener('abort', run.abort, { once: true })
+    const r = await run.promise
+    ctx.print(`comp replaced: ${r.files} files (${r.added} added, ${r.changed} changed, ${r.removed} removed, ${r.unchanged} unchanged), commit ${r.commit_id}`, 'ok')
+  },
+}
+
 export const EDITING_COMMANDS: TermCommand[] = [
   proposalCommand,
   compCommand,
+  compReplaceCommand,
   {
     name: 'apply', group: 'Editor', usage: 'apply [status] <editor|contributor> [--motivation "…"] [--experience "…"] [--areas "…"] [--contact "…"] [--name "…"] [--channel c]',
     description: 'Apply to become an editor or contributor, or check the state of your application (apply status editor)',

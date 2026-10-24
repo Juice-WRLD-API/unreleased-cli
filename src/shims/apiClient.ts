@@ -12,7 +12,7 @@ export interface ApiRequestOptions extends RequestInit {
   parseError?: (res: Response) => Promise<string>
 }
 
-async function defaultParseError(res: Response): Promise<string> {
+export async function defaultParseError(res: Response): Promise<string> {
   try {
     const body = await res.json() as Record<string, unknown>
     if (typeof body === 'string') return body

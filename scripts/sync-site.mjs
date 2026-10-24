@@ -3,12 +3,12 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sitePlugin, siteDefine } from '../site-modules.mjs'
+import { sitePlugin, siteDefine, siteInject } from '../site-modules.mjs'
 
 // Copies the site files the CLI compiles in into site/, from a checkout of the
 // site repo:
 //
-//   npm run sync                      the checkout next to this one (../music-player-web)
+//   npm run sync                      the app checkout next to this one (../unreleased-app)
 //   npm run sync -- <path>            another checkout
 //   UNRELEASED_SITE=<path> npm run sync
 //
@@ -17,7 +17,7 @@ import { sitePlugin, siteDefine } from '../site-modules.mjs'
 // Run it when the site's modules change, then rebuild; site/SYNCED_FROM.json
 // says which site commit the copy came from.
 const here = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const siteRoot = resolve(process.argv[2] || process.env.UNRELEASED_SITE || resolve(here, '../music-player-web'))
+const siteRoot = resolve(process.argv[2] || process.env.UNRELEASED_SITE || resolve(here, '../unreleased-app'))
 const probe = resolve(siteRoot, 'src/renderer/src/lib/terminal/types.ts')
 if (!existsSync(probe)) {
   console.error(`${siteRoot} doesn't look like the site repo (no src/renderer/src/lib/terminal/types.ts). Pass its path: npm run sync -- <path>`)
@@ -33,6 +33,7 @@ const result = await build({
   target: 'node20',
   define: { __VERSION__: '"sync"', ...siteDefine },
   plugins: [sitePlugin(siteRoot, here)],
+  inject: siteInject(here),
   metafile: true,
   logLevel: 'error',
 })

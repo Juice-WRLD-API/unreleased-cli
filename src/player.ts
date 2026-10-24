@@ -11,6 +11,7 @@ import { pref, setPref } from './prefs'
 
 export interface Track {
   title: string
+  headers?: Record<string, string>
   /** Library song id; absent for a file played straight from the tree. */
   songId?: number
   era?: string
@@ -46,6 +47,8 @@ function fisherYates<T>(items: T[]): T[] {
 
 export class Player {
   queue: Track[] = []
+  history: Track[] = []
+  private lastPlayed: Track | null = null
   index = -1
   // The modes persist between sessions, as they do on the site (set / termtheme
   // keep them in settings.json).
@@ -162,6 +165,7 @@ export class Player {
     const mpv = await this.engine()
     this.index = i
     const track = this.queue[i]
+    await mpv.set('http-header-fields', Object.entries(track.headers ?? {}).map(([name, value]) => `${name}: ${value}`))
     this.loadedTrack = null
     this.mpvDuration = 0
     const opened = new Promise<void>((resolve, reject) => {
@@ -186,6 +190,8 @@ export class Player {
     }
     await opened
     this.loadedTrack = track
+    if (this.lastPlayed && this.lastPlayed !== track) this.history = [...this.history.slice(-199), this.lastPlayed]
+    this.lastPlayed = track
     await mpv.set('pause', false)
     return track
   }
